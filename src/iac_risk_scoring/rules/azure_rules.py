@@ -17,21 +17,34 @@ class PublicIPRule(RiskRule):
     def evaluate(self, resource: IaCResource) -> Optional[RiskFinding]:
         properties = resource.properties
         
-        # Check for public IP in various Azure resources
-        if any(key in properties for key in ['publicIPAddress', 'publicIpAddress', 'publicNetworkAccess']):
-            public_access = properties.get('publicNetworkAccess', 'Enabled')
-            if public_access == 'Enabled' or 'publicIPAddress' in properties or 'publicIpAddress' in properties:
-                return RiskFinding(
-                    category=RiskCategory.SECURITY,
-                    level=RiskLevel.HIGH,
-                    resource_type=resource.resource_type,
-                    resource_name=resource.name,
-                    rule_id=self.rule_id,
-                    title=self.title,
-                    description=self.description,
-                    remediation=self.remediation,
-                    location=resource.location,
-                )
+        # Check for public IP assignment
+        if 'publicIPAddress' in properties or 'publicIpAddress' in properties:
+            return RiskFinding(
+                category=RiskCategory.SECURITY,
+                level=RiskLevel.HIGH,
+                resource_type=resource.resource_type,
+                resource_name=resource.name,
+                rule_id=self.rule_id,
+                title=self.title,
+                description=self.description,
+                remediation=self.remediation,
+                location=resource.location,
+            )
+        
+        # Check for public network access setting
+        public_access = properties.get('publicNetworkAccess', 'Disabled')
+        if public_access == 'Enabled':
+            return RiskFinding(
+                category=RiskCategory.SECURITY,
+                level=RiskLevel.HIGH,
+                resource_type=resource.resource_type,
+                resource_name=resource.name,
+                rule_id=self.rule_id,
+                title=self.title,
+                description=self.description,
+                remediation=self.remediation,
+                location=resource.location,
+            )
         
         return None
 
@@ -69,7 +82,30 @@ class StorageEncryptionRule(RiskRule):
         # Check if encryption is disabled
         if isinstance(encryption, dict):
             services = encryption.get('services', {})
-            if not services or not any(services.values()):
+            if not services:
+                return RiskFinding(
+                    category=RiskCategory.SECURITY,
+                    level=RiskLevel.CRITICAL,
+                    resource_type=resource.resource_type,
+                    resource_name=resource.name,
+                    rule_id=self.rule_id,
+                    title=self.title,
+                    description=self.description,
+                    remediation=self.remediation,
+                    location=resource.location,
+                )
+            
+            # Check if any service is enabled - services can be boolean or dict with 'enabled' key
+            has_encryption = False
+            for service in services.values():
+                if isinstance(service, bool) and service:
+                    has_encryption = True
+                    break
+                elif isinstance(service, dict) and service.get('enabled'):
+                    has_encryption = True
+                    break
+            
+            if not has_encryption:
                 return RiskFinding(
                     category=RiskCategory.SECURITY,
                     level=RiskLevel.CRITICAL,

@@ -1,4 +1,5 @@
 """Main risk scoring orchestrator."""
+import json
 from typing import List, Optional
 from pathlib import Path
 from .models import RiskScore, IaCResource
@@ -98,9 +99,10 @@ class RiskScorer:
                     content = file_path.read_text(encoding='utf-8')
                     resources = parser.parse(content)
                     all_resources.extend(resources)
-                except Exception as e:
+                except (IOError, ValueError, json.JSONDecodeError) as e:
                     # Log error but continue with other files
-                    print(f"Warning: Failed to parse {file_path}: {e}")
+                    import sys
+                    print(f"Warning: Failed to parse {file_path}: {e}", file=sys.stderr)
 
         return self.analyzer.analyze(all_resources)
 

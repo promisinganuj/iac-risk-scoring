@@ -1,0 +1,55 @@
+# Example configuration file for IaC Risk Scoring
+# Copy this to config.yaml and customize as needed
+
+# Risk scoring thresholds
+thresholds:
+  critical: 90
+  high: 70
+  medium: 40
+  low: 10
+
+# Rules configuration
+rules:
+  # Enable/disable specific rules
+  enabled:
+    - AZ-SEC-001  # Public IP Address Assignment
+    - AZ-SEC-002  # Storage Encryption Not Enabled
+    - AZ-SEC-003  # HTTPS Not Enforced
+    - AZ-SEC-004  # Weak TLS Version
+
+  # Disable specific rules
+  disabled: []
+
+# Parser settings
+parsers:
+  arm:
+    enabled: true
+    file_patterns:
+      - "*.json"
+      - "*.template.json"
+  
+  terraform:
+    enabled: true
+    file_patterns:
+      - "*.tf"
+
+# Output settings
+output:
+  format: text  # text or json
+  verbose: false
+  
+# Resource exclusions (resources to skip during analysis)
+exclusions:
+  resources: []
+  # Example:
+  # - "Microsoft.Storage/storageAccounts/development*"
+  # - "azurerm_storage_account.test_*"
+  
+  resource_types: []
+  # Example:
+  # - "Microsoft.Insights/*"
+
+# Custom metadata to include in reports
+metadata:
+  project: "my-project"
+  environment: "production"

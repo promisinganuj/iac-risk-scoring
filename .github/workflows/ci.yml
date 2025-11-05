@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest pytest-cov black flake8 mypy
+    
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Format check with black
+      run: |
+        black --check src/ tests/
+    
+    - name: Type check with mypy
+      run: |
+        mypy src/ --ignore-missing-imports || true
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --cov=iac_risk_scoring --cov-report=xml --cov-report=term
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  iac-risk-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install iac-risk-scoring
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+    
+    - name: Check example templates
+      run: |
+        echo "Checking secure templates (should pass)..."
+        iac-risk-score examples/arm/storage-account-secure.json --fail-on high
+        iac-risk-score examples/terraform/storage-account-secure.tf --fail-on high
+        
+        echo "Checking insecure templates (expected to find issues)..."
+        iac-risk-score examples/arm/storage-account-insecure.json --format json || echo "Found issues as expected"
+        iac-risk-score examples/terraform/storage-account-insecure.tf --format json || echo "Found issues as expected"

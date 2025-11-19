@@ -1,0 +1,70 @@
+# RESOURCE
+# ATTACHED_TO
+# USED_BY
+# ADMINISTERED_BY
+# CONTAINS
+# USES
+# CAN_WRITE_FROM
+# CAN_READ_FROM
+# ASSOCIATED_WITH
+# CONFIGURED_WITH
+# HAS_ASSESSMENT
+# HAS_METRIC_ALERT
+
+# --------------------------------------------------------------------
+# CONFIG FOR RESOURCE RELATIONSHIPS BETWEEN AZURE RESOURCES
+# --------------------------------------------------------------------
+
+# 1. Hierarchical relationships based on ARM path structure
+hierarchy_rules:
+  - parent: "microsoft.resources/subscriptions"
+    child: "microsoft.resources/resourcegroups"
+    relationship: "HAS"
+
+  - parent: "microsoft.resources/resourcegroups"
+    child: "*"
+    relationship: "HAS"
+
+  - parent: "microsoft.network/virtualnetworks"
+    child: "microsoft.network/virtualnetworks/subnets"
+    relationship: "HAS"
+
+  - parent: "microsoft.network/networksecuritygroups"
+    child: "microsoft.network/networksecuritygroups/securityrules"
+    relationship: "HAS_RULE"
+
+  # AI Foundry Hub → Projects (nested resource)
+  - parent: "microsoft.cognitiveservices/accounts"
+    child: "microsoft.cognitiveservices/accounts/projects"
+    relationship: "HAS_PROJECT"
+
+# 2. Runtime relationships based on resource properties
+property_rules:
+  # NIC → Subnet
+  - source_type: "microsoft.network/networkinterfaces"
+    property_path: "properties.ipConfigurations[*].properties.subnet.id"
+    relationship: "PLACED_IN"
+
+  # Subnet → NSG
+  - source_type: "microsoft.network/virtualnetworks/subnets"
+    property_path: "properties.networkSecurityGroup.id"
+    relationship: "ASSOCIATED_WITH"
+
+  # Subnet → Nat Gateway
+  - source_type: "microsoft.network/virtualnetworks/subnets"
+    property_path: "properties.natGateway.id"
+    relationship: "USES_NAT_GATEWAY"
+
+  # NAT Gateway → Public IP
+  - source_type: "microsoft.network/natgateways"
+    property_path: "properties.publicIpAddresses[*].id"
+    relationship: "USES_PUBLIC_IP"
+
+# 3. Dependency rules from Azure Resource Graph "dependencies" field
+dependency_rules:
+  relationship: "DEPENDS_ON"
+
+# 4. Optional rule: infer relationships based on tags
+tag_rules:
+  - tag_name: "dependsOn"
+    relationship: "DEPENDS_ON"

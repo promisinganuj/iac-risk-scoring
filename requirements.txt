@@ -1,0 +1,9 @@
+azure-identity
+azure-mgmt-resourcegraph
+azure-mgmt-subscription
+gremlinpython
+pandas
+python-dotenv
+PyYAML
+jmespath
+jsonpath_ng

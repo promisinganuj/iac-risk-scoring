@@ -2,7 +2,7 @@
   "servers": {
     "neo4j-database": {
       "command": "uvx",
-      "args": [ "mcp-neo4j-cypher@0.5.2", "--transport", "stdio"  ],
+      "args": [ "--native-tls", "mcp-neo4j-cypher@0.5.2", "--transport", "stdio"  ],
       "env": {
         "NEO4J_URI": "${env:NEO4J_URI}",
         "NEO4J_USERNAME": "${env:NEO4J_USERNAME}",

@@ -8,3 +8,4 @@ PyYAML
 jmespath
 jsonpath_ng
 mcp-neo4j-cypher
+beads-mcp

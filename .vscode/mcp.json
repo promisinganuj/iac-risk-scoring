@@ -9,6 +9,14 @@
         "NEO4J_PASSWORD": "<your-password>",
         "NEO4J_DATABASE": "neo4j"
       }
+    },
+    "beads": {
+      "type": "stdio",
+      "command": "/Users/anuj/002-GitHub/iac-risk-scoring/.venv/bin/beads-mcp",
+      "args": [],
+      "env": {
+        "BEADS_WORKING_DIR": "/Users/anuj/002-GitHub/iac-risk-scoring"
+      }
     }
   }
 }

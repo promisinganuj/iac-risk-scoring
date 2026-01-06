@@ -10,8 +10,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 NEO4J_PASSWORD="${NEO4J_PASSWORD:-password}"
-NEO4J_HTTP_PORT="${NEO4J_HTTP_PORT:-7475}"
-NEO4J_BOLT_PORT="${NEO4J_BOLT_PORT:-7688}"
+NEO4J_HTTP_PORT="${NEO4J_HTTP_PORT:-7474}"
+NEO4J_BOLT_PORT="${NEO4J_BOLT_PORT:-7687}"
+
+export NEO4J_PASSWORD
+export NEO4J_HTTP_PORT
+export NEO4J_BOLT_PORT
 
 echo "Starting Neo4j container..."
 docker compose up -d neo4j

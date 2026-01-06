@@ -38,7 +38,10 @@ The helper script starts Neo4j and runs the import Cypher against the mounted CS
 ./scripts/neo4j_up_and_import.sh
 ```
 
-Re-running the import is intended to be safe (uses constraints + `MERGE`), but properties may be updated on re-run.
+**Idempotency**: Re-running the import is safe. The script uses Neo4j constraints with `MERGE` operations, so:
+- Nodes with the same unique identifiers won't be duplicated
+- Properties may be updated on re-run
+- Relationships are recreated safely without duplication
 
 ## 3) Open Neo4j Browser
 
@@ -54,11 +57,38 @@ Login:
 
 ## 4) Minimal validation queries
 
-Run these from your shell:
+Validate the import completed successfully:
 
 ```bash
+./scripts/validate_import.sh
+```
+
+This script checks:
+- Node counts for all entity types (Service, Incident, AzureResource, etc.)
+- Relationship counts between nodes
+- Sample service with its connected entities
+
+**Expected node counts from sample data:**
+- Services: 12
+- Incidents: 12
+- Azure Resources: 12
+- Deployments: 12
+- Templates: 12
+- Subscriptions: 7
+- Resource Groups: 24
+- Repos: 14
+- Teams: 12
+
+**Manual validation queries** (run from your shell):
+
+```bash
+# Count services
 docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (s:Service) RETURN count(s) AS services;"
+
+# Count incidents
 docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (i:Incident) RETURN count(i) AS incidents;"
+
+# Count resources
 docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (r:AzureResource) RETURN count(r) AS resources;"
 ```
 

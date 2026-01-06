@@ -6,8 +6,7 @@ services:
       - "${NEO4J_HTTP_PORT:-7474}:7474"
       - "${NEO4J_BOLT_PORT:-7687}:7687"
     environment:
-      # Set NEO4J_PASSWORD in your shell or in an .env file.
-      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password}
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-please-change-me}
       - NEO4J_server_directories_import=/import
       - NEO4J_dbms_security_allow__csv__import__from__file__urls=true
     volumes:

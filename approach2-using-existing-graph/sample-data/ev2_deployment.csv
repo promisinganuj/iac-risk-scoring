@@ -1,0 +1,13 @@
+rolloutId,serviceId,serviceGroup,rolloutInfra,artifactVersion,resourceGroup,subscriptionId
+RL-2025-101,A56C6700-6666-4444-AAAA-000F3B9CC999,Finance,AKS-eastus2-v4,2025.3.1,rg-alpha-core,subs-prod-001
+RL-2025-102,B77D8800-7777-5555-BBBB-001F4C9DD888,RetailOps,AppService-centralus-2,2025.2.8,rg-beta-api,subs-prod-002
+RL-2025-103,C88E9900-8888-6666-CCCC-002F5D9EE777,DataScience,Databricks-eastus2,2025.4.0,rg-gamma-analytics,subs-prod-003
+RL-2025-104,D99FA000-9999-7777-DDDD-003F6E9FF666,PlatformCore,AKS-westus2-v3,2025.1.5,rg-delta-platform,subs-prod-001
+RL-2025-105,F12A1100-1111-8888-EEEE-004F7FA0AA55,Messaging,EventHub-eastus-standard,2025.1.12,rg-omega-messaging,subs-prod-002
+RL-2025-106,0ABC2200-2222-9999-FFFF-005F8FA1BB44,Identity,AAD-automation,2025.3.4,rg-lambda-id,subs-prod-004
+RL-2025-107,1BCD3300-3333-AAAB-EEEE-006F9FB2CC33,Healthcare,SQLFailover-centralus,2025.2.1,rg-phi-health,subs-prod-003
+RL-2025-108,2CDE4400-4444-BBBB-FFFF-007FABF3DD22,Advertising,EventGrid-eastus2,2025.3.2,rg-kappa-ads,subs-prod-005
+RL-2025-109,3DEF5500-5555-CCCC-AAAA-008FBCF4EE11,Commerce,CosmosDB-centralus,2025.1.9,rg-zeta-commerce,subs-prod-002
+RL-2025-110,4EFA6600-6666-DDDD-BBBB-009FCD045F00,Observability,Storage-eastus,2025.2.6,rg-theta-observability,subs-prod-004
+RL-2025-111,5F0A7700-7777-EEEE-CCCC-00AFDE156FEE,Collaboration,AppService-westus,2025.4.1,rg-sigma-collab,subs-dev-001
+RL-2025-112,6A1B8800-8888-FFFF-DDDD-00BFED267FDD,Observability,FunctionApp-eastus2,2025.5.0,rg-tau-observability,subs-prod-005

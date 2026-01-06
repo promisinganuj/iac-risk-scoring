@@ -1,0 +1,18 @@
+incidentId,owningTeam,ownerAlias,serviceId,infrastructureInvolved,causeDescription
+ICM-2025-1001,payments-ops,liaison1,A56C6700-6666-4444-AAAA-000F3B9CC999,AKS-eastus2,Failed outbound TLS handshake causing payment decline
+ICM-2025-1002,retailops,liaison2,B77D8800-7777-5555-BBBB-001F4C9DD888,AppService-centralus,Circular dependency triggered cold start delay
+ICM-2025-1003,data-analytics,liaison3,C88E9900-8888-6666-CCCC-002F5D9EE777,Databricks-cluster,Job driver container crashed after dependency update
+ICM-2025-1004,platform-sre,liaison4,D99FA000-9999-7777-DDDD-003F6E9FF666,AKS-westus2,Node pool upgrade disrupted control plane
+ICM-2025-1005,messaging-ops,liaison5,F12A1100-1111-8888-EEEE-004F7FA0AA55,EventHub-namespace,Partition rebalancing backlog choked throughput
+ICM-2025-1006,identity,liaison6,0ABC2200-2222-9999-FFFF-005F8FA1BB44,AAD-domain,Certificate rotation misconfigured
+ICM-2025-1007,healthcare-platform,liaison7,1BCD3300-3333-AAAB-EEEE-006F9FB2CC33,SQL-primary,Failover script executed before data sync
+ICM-2025-1008,ads-eng,liaison8,2CDE4400-4444-BBBB-FFFF-007FABF3DD22,EventGrid-eastus2,Azure policy blocked event subscription creation
+ICM-2025-1009,commerce,liaison9,3DEF5500-5555-CCCC-AAAA-008FBCF4EE11,CosmosDB-centralus,Index transformation slowed writes
+ICM-2025-1010,obs-analytics,liaison10,4EFA6600-6666-DDDD-BBBB-009FCD045F00,Storage-eastus,Partition key hot spot led to throttling
+ICM-2025-1011,collab-sre,liaison11,5F0A7700-7777-EEEE-CCCC-00AFDE156FEE,AppService-westus,Pipeline rollback left stale slot
+ICM-2025-1012,obs-platform,liaison12,6A1B8800-8888-FFFF-DDDD-00BFED267FDD,FunctionApp-eastus2,Dependency upgrade introduced binding mismatch
+ICM-2025-1008,ads-eng,liaison8,SVC-KAPPA,EventGrid-eastus2,Azure policy blocked event subscription creation
+ICM-2025-1009,commerce,liaison9,SVC-ZETA,CosmosDB-centralus,Index transformation slowed writes
+ICM-2025-1010,obs-analytics,liaison10,SVC-THETA,Storage-eastus,Partition key hot spot led to throttling
+ICM-2025-1011,collab-sre,liaison11,SVC-SIGMA,AppService-westus,Pipeline rollback left stale slot
+ICM-2025-1012,obs-platform,liaison12,SVC-TAU,FunctionApp-eastus2,Dependency upgrade introduced binding mismatchincidentId, owningTeam, ownerAilas, serviceId, infrastructureInvolved, causeDescription

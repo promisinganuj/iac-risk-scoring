@@ -1,0 +1,13 @@
+sourceControlType,sourceControlURI,serviceArtifacts,applicationCode,iacConfiguration
+GitHub,https://github.com/contoso/payments,webhook-service|payment-worker,Node.js/Express,Terraform/rg-alpha-core
+GitHub,https://github.com/contoso/beta-retail,checkout-api|inventory-sync,Java/SpringBoot,Bicep/rg-beta-api
+GitHub,https://github.com/contoso/gamma-data,model-trainer|feature-store,Python/PyTorch,Terragrunt/rg-gamma-analytics
+GitHub,https://github.com/contoso/delta-core,control-plane|auth-service,Go/micro,Bicep/rg-delta-platform
+GitHub,https://github.com/contoso/omega-msg,relay|event-proxy,Scala/Akka,Terraform/rg-omega-messaging
+GitHub,https://github.com/contoso/lambda-id,identity-gateway|policy-service,C#/.NET,Bicep/rg-lambda-id
+GitHub,https://github.com/contoso/phi-health,patient-api|reporting,Python/Django,Terragrunt/rg-phi-health
+GitHub,https://github.com/contoso/kappa-ads,event-hub-ingest|bidder,Java/Quarkus,Terraform/rg-kappa-ads
+GitHub,https://github.com/contoso/zeta-commerce,product-catalog|order-processor,JavaScript/Node,Bicep/rg-zeta-commerce
+GitHub,https://github.com/contoso/theta-logs,log-collector|alerting,Go/Logrus,Terragrunt/rg-theta-observability
+GitHub,https://github.com/contoso/sigma-collab,video-service|chat-service,TypeScript/React,Bicep/rg-sigma-collab
+GitHub,https://github.com/contoso/tau-observ,event-map|metrics-pipeline,Python/Flask,Terraform/rg-tau-observabilitysourceControlType, sourceControlURI, serviceArtifacts, applicationCode, iacConfiguration

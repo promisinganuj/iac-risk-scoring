@@ -1,0 +1,13 @@
+resourceId,displayName,resourceType,resourceGroup,subscriptionId,location,tags
+res-alpha-app,Alpha Payments Web App,Microsoft.Web/sites,rg-alpha-core,subs-prod-001,eastus2,"env:prod;owner:payments;serviceId:A56C6700-6666-4444-AAAA-000F3B9CC999"
+res-beta-api,Beta Retail API,Microsoft.Web/sites,rg-beta-api,subs-prod-002,centralus,"env:prod;owner:retail;serviceId:B77D8800-7777-5555-BBBB-001F4C9DD888"
+res-gamma-lake,Gamma Insights Data Lake,Microsoft.Storage/storageAccounts,rg-gamma-analytics,subs-prod-003,eastus2,"env:prod;owner:data;serviceId:C88E9900-8888-6666-CCCC-002F5D9EE777"
+res-delta-k8s,Delta Core AKS,Microsoft.ContainerService/managedClusters,rg-delta-platform,subs-prod-001,westus2,"env:prod;owner:platform;serviceId:D99FA000-9999-7777-DDDD-003F6E9FF666"
+res-omega-eventhub,Omega Messaging Event Hub,Microsoft.EventHub/namespaces,rg-omega-messaging,subs-prod-002,eastus,"env:prod;owner:messaging;serviceId:F12A1100-1111-8888-EEEE-004F7FA0AA55"
+res-lambda-ad,Lambda Identity Directory,Microsoft.AAD/domainServices,rg-lambda-id,subs-prod-004,westus2,"env:prod;owner:identity;serviceId:0ABC2200-2222-9999-FFFF-005F8FA1BB44"
+res-phi-meddb,Phi Health SQL Database,Microsoft.Sql/servers/databases,rg-phi-health,subs-prod-003,centralus,"env:prod;owner:health;serviceId:1BCD3300-3333-AAAB-EEEE-006F9FB2CC33"
+res-kappa-ads,Kappa Ads Event Grid,Microsoft.EventGrid/namespaces,rg-kappa-ads,subs-prod-005,eastus2,"env:prod;owner:ads;serviceId:2CDE4400-4444-BBBB-FFFF-007FABF3DD22"
+res-zeta-commerce,Zeta Commerce Cosmos,Microsoft.DocumentDB/databaseAccounts,rg-zeta-commerce,subs-prod-002,centralus,"env:prod;owner:commerce;serviceId:3DEF5500-5555-CCCC-AAAA-008FBCF4EE11"
+res-theta-logs,Theta Logs Storage,Microsoft.Storage/storageAccounts,rg-theta-observability,subs-prod-004,eastus,"env:prod;owner:observability;serviceId:4EFA6600-6666-DDDD-BBBB-009FCD045F00"
+res-sigma-collab,Sigma Collaboration App Service,Microsoft.Web/sites,rg-sigma-collab,subs-dev-001,westus,"env:dev;owner:collab;serviceId:5F0A7700-7777-EEEE-CCCC-00AFDE156FEE"
+res-tau-obs,Tau Observability Function,Microsoft.Web/sites,rg-tau-observability,subs-prod-005,eastus2,"env:prod;owner:observability;serviceId:6A1B8800-8888-FFFF-DDDD-00BFED267FDD"

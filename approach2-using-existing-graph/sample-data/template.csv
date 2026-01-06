@@ -1,0 +1,13 @@
+templateVersion,templateName,resourceGroup,resourceType,properties
+1.0,alpha-core-web,rg-alpha-core,Microsoft.Web/sites,"sku:S1;runtime:node"
+1.1,beta-api,rg-beta-api,Microsoft.Web/sites,"sku:P1v2;runtime:dotnet"
+2.0,gamma-lake,rg-gamma-analytics,Microsoft.Storage/storageAccounts,"tier:Standard;replication:ZRS"
+3.2,delta-platform,rg-delta-platform,Microsoft.ContainerService/managedClusters,"nodeCount:3;vmSize:Standard_D4"
+1.4,omega-messaging,rg-omega-messaging,Microsoft.EventHub/namespaces,"sku:Standard;capacity:2"
+1.0,lambda-identity,rg-lambda-id,Microsoft.AAD/domainServices,"dnsName:lambda.contoso.com;sku:Standard"
+2.1,phi-health-db,rg-phi-health,Microsoft.Sql/servers/databases,"collation:SQL_Latin1_General_CP1_CI_AS;backupDaily:true"
+1.3,kappa-ads-event,rg-kappa-ads,Microsoft.EventGrid/namespaces,"topics:billing|clicks"
+2.2,zeta-commerce-db,rg-zeta-commerce,Microsoft.DocumentDB/databaseAccounts,"consistency:Session;multiRegion:true"
+1.5,theta-logs-storage,rg-theta-observability,Microsoft.Storage/storageAccounts,"tier:Premium;accessTier:Hot"
+1.0,sigma-collab,rg-sigma-collab,Microsoft.Web/sites,"sku:S1;stack:dotnet"
+1.0,tau-observ-func,rg-tau-observability,Microsoft.Web/sites,"functions:3;runtime:python"

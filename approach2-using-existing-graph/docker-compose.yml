@@ -1,0 +1,21 @@
+services:
+  neo4j:
+    image: neo4j:5
+    container_name: neo4j-risk
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    environment:
+      # Set NEO4J_PASSWORD in your shell or in an .env file.
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password}
+      - NEO4J_server_directories_import=/import
+      - NEO4J_dbms_security_allow__csv__import__from__file__urls=true
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - "./sample-data:/import/data:ro"
+      - "./scripts/neo4j_import.cypher:/import/neo4j_import.cypher:ro"
+
+volumes:
+  neo4j_data:
+  neo4j_logs:

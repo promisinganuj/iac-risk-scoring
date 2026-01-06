@@ -1,0 +1,13 @@
+title,incidentId,serviceId,serviceName,createdDate,severity,changeRelated,rootCause,rootCauseSubcategory,subscriptionsImpacted
+Payment TLS handshake failure,ICM-2025-1001,A56C6700-6666-4444-AAAA-000F3B9CC999,Azure App Service (Payments),2025-11-04,High,Yes,TLS certificate expired,Security,subs-prod-001
+Retail API cold start loop,ICM-2025-1002,B77D8800-7777-5555-BBBB-001F4C9DD888,Azure API Management (Retail),2025-10-22,Medium,No,Dependency loop on startup,Application,subs-prod-002
+Gamma analytics job crash,ICM-2025-1003,C88E9900-8888-6666-CCCC-002F5D9EE777,Azure Databricks (Insights),2025-09-30,High,Yes,Databricks driver crash,Platform,subs-prod-003;subs-dev-002
+Delta control plane ripple,ICM-2025-1004,D99FA000-9999-7777-DDDD-003F6E9FF666,Azure Kubernetes Service (Core),2025-11-18,Medium,Yes,AKS upgrade disrupted API server,Platform,subs-prod-001
+Omega event backlog,ICM-2025-1005,F12A1100-1111-8888-EEEE-004F7FA0AA55,Azure Event Hubs (Messaging),2025-11-20,High,No,EventHub partition drift,Network,subs-prod-002;subs-prod-005
+Lambda certificate rotation,ICM-2025-1006,0ABC2200-2222-9999-FFFF-005F8FA1BB44,Azure AD Domain Services (Identity),2025-12-01,High,Yes,Certificate rotation misconfig,Security,subs-prod-004
+Phi database failover early,ICM-2025-1007,1BCD3300-3333-AAAB-EEEE-006F9FB2CC33,Azure SQL Managed Instance (Health),2025-10-15,High,No,Failover ran before sync,Availability,subs-prod-003
+Kappa policy block,ICM-2025-1008,2CDE4400-4444-BBBB-FFFF-007FABF3DD22,Azure Event Grid (Advertising),2025-11-27,Medium,Yes,Policy blocked subscription,Governance,subs-prod-005
+Zeta Cosmos slowdown,ICM-2025-1009,3DEF5500-5555-CCCC-AAAA-008FBCF4EE11,Azure Cosmos DB (Commerce),2025-11-05,Medium,No,Index transformation slowed writes,Storage,subs-prod-002
+Theta storage throttling,ICM-2025-1010,4EFA6600-6666-DDDD-BBBB-009FCD045F00,Azure Storage Account (Observability Logs),2025-12-03,Low,No,Partition key hot spot,Storage,subs-prod-004
+Sigma slot rollback,ICM-2025-1011,5F0A7700-7777-EEEE-CCCC-00AFDE156FEE,Azure Static Web Apps (Collaboration),2025-09-18,Medium,Yes,Pipeline rollback left stale slot,Deployment,subs-dev-001
+Tau binding mismatch,ICM-2025-1012,6A1B8800-8888-FFFF-DDDD-00BFED267FDD,Azure Functions (Observability Metrics),2025-12-07,High,Yes,Bindings incompatible with extension,Application,subs-prod-005;subs-dev-002

@@ -2,12 +2,16 @@
 
 This project uses **bd** (Beads) for issue tracking. Run `bd onboard` to get started.
 
-You have access to the following MCP server:
+You have access to the following MCP servers:
 
 - **beads** (Beads issue tracker)
    - Use the MCP tools with prefix `mcp_beads_*` (e.g., `mcp_beads_ready`, `mcp_beads_show`, `mcp_beads_update`, `mcp_beads_close`).
    - Before any Beads write operation (create/update/close/dep), call:
       - `mcp_beads_context(action='set', workspace_root='/Users/anuj/002-GitHub/iac-risk-scoring')`
+  
+- **neo4j-database** (Neo4j MCP server for risk advisor)
+  - This MCP server allows to extract the graph database scheme to give the agent-LLM to generated Cypher queries to query and update the database.
+  - You can use the following MCP Tools: `get-neo4j-schema`, `read-neo4j-cypher`, `write-neo4j-cypher`
 
 ## Working Agreement (Beads-First)
 

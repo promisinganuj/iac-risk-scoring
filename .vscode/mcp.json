@@ -8,14 +8,15 @@
         "NEO4J_USERNAME": "${env:NEO4J_USERNAME}",
         "NEO4J_PASSWORD": "${env:NEO4J_PASSWORD}",
         "NEO4J_DATABASE": "${env:NEO4J_DATABASE}"
-      }
+      },
+      "envFile": "${workspaceFolder}/approach2-using-existing-graph/.env"
     },
     "beads": {
       "type": "stdio",
       "command": "/Users/anuj/002-GitHub/iac-risk-scoring/.venv/bin/beads-mcp",
       "args": [],
       "env": {
-        "BEADS_WORKING_DIR": "/Users/anuj/002-GitHub/iac-risk-scoring"
+        "BEADS_WORKING_DIR": "${workspaceFolder}"
       }
     }
   }

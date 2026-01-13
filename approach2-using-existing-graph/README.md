@@ -111,3 +111,14 @@ Then restart the `neo4j-database` MCP server.
 The graph-based risk scoring CLI is tracked in the Beads issue `approach2-b03` and is not implemented yet.
 
 Once available, this README will be updated with the exact command to run it.
+
+## 7) Natural-language risk questions (playbook)
+
+For brainstorming and smoke exploration of the Neo4j MCP server (read-only), see:
+
+- `risk_advisor/queries.md`
+
+Key constraints for the MVP:
+- Read-only graph access (`MATCH/RETURN` only)
+- Template-only queries (do not execute user-provided Cypher)
+- Bounded retrieval (use `LIMIT`, keep traversal depth small)

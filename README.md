@@ -14,10 +14,10 @@ Ingests resources from **Azure Resource Graph** into **Azure Cosmos DB Gremlin A
 Quick start:
 
 ```bash
-cd approach1-creating-knowlege-graph
 uv venv .venv
 source .venv/bin/activate
-uv pip install -r ../requirements.txt --native-tls
+uv pip install -r requirements.txt --native-tls
+cd approach1-creating-knowlege-graph
 
 cp .env.template .env
 # edit .env

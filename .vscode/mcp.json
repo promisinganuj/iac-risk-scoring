@@ -7,7 +7,7 @@
     },
     "beads": {
       "type": "stdio",
-      "command": "/Users/anuj/002-GitHub/iac-risk-scoring/.venv/bin/beads-mcp",
+      "command": "${workspaceFolder}/.venv/bin/beads-mcp",
       "args": [],
       "env": {
         "BEADS_WORKING_DIR": "${workspaceFolder}"

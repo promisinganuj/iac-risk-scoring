@@ -10,4 +10,4 @@ GitHub,https://github.com/contoso/kappa-ads,event-hub-ingest|bidder,Java/Quarkus
 GitHub,https://github.com/contoso/zeta-commerce,product-catalog|order-processor,JavaScript/Node,Bicep/rg-zeta-commerce
 GitHub,https://github.com/contoso/theta-logs,log-collector|alerting,Go/Logrus,Terragrunt/rg-theta-observability
 GitHub,https://github.com/contoso/sigma-collab,video-service|chat-service,TypeScript/React,Bicep/rg-sigma-collab
-GitHub,https://github.com/contoso/tau-observ,event-map|metrics-pipeline,Python/Flask,Terraform/rg-tau-observabilitysourceControlType, sourceControlURI, serviceArtifacts, applicationCode, iacConfiguration
+GitHub,https://github.com/contoso/tau-observ,event-map|metrics-pipeline,Python/Flask,Terraform/rg-tau-observability

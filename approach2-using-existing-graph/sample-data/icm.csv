@@ -11,8 +11,3 @@ ICM-2025-1009,commerce,liaison9,3DEF5500-5555-CCCC-AAAA-008FBCF4EE11,CosmosDB-ce
 ICM-2025-1010,obs-analytics,liaison10,4EFA6600-6666-DDDD-BBBB-009FCD045F00,Storage-eastus,Partition key hot spot led to throttling
 ICM-2025-1011,collab-sre,liaison11,5F0A7700-7777-EEEE-CCCC-00AFDE156FEE,AppService-westus,Pipeline rollback left stale slot
 ICM-2025-1012,obs-platform,liaison12,6A1B8800-8888-FFFF-DDDD-00BFED267FDD,FunctionApp-eastus2,Dependency upgrade introduced binding mismatch
-ICM-2025-1008,ads-eng,liaison8,SVC-KAPPA,EventGrid-eastus2,Azure policy blocked event subscription creation
-ICM-2025-1009,commerce,liaison9,SVC-ZETA,CosmosDB-centralus,Index transformation slowed writes
-ICM-2025-1010,obs-analytics,liaison10,SVC-THETA,Storage-eastus,Partition key hot spot led to throttling
-ICM-2025-1011,collab-sre,liaison11,SVC-SIGMA,AppService-westus,Pipeline rollback left stale slot
-ICM-2025-1012,obs-platform,liaison12,SVC-TAU,FunctionApp-eastus2,Dependency upgrade introduced binding mismatchincidentId, owningTeam, ownerAilas, serviceId, infrastructureInvolved, causeDescription

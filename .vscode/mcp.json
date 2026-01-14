@@ -1,7 +1,7 @@
 {
   "servers": {
     "neo4j-database": {
-      "command": "$HOME/.local/bin/uvx",
+      "command": "/home/anujparashar/.local/bin/uvx",
       "args": [ "--native-tls", "mcp-neo4j-cypher@0.5.2", "--transport", "stdio"  ],
       "envFile": "${workspaceFolder}/approach2-using-existing-graph/.env"
     },

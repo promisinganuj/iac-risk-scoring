@@ -10,17 +10,28 @@ Run Neo4j in Docker, ingest the sample CSV dataset, and query it via the Neo4j M
 
 ## 1) Configure environment
 
-From this folder:
+From the root folder of the repo:
 
 ```bash
-cd /Users/anuj/002-GitHub/iac-risk-scoring/approach2-using-existing-graph
+source .venv/bin/activate
+cd approach2-using-existing-graph
 cp .env.template .env
 ```
 
 Edit `.env` and set at least:
 
-- `NEO4J_PASSWORD`
-- (optional) `NEO4J_HTTP_PORT`, `NEO4J_BOLT_PORT`
+```bash
+NEO4J_PASSWORD=<please-change-me>
+
+# Neo4j connection info (used by the Neo4j MCP server config in .vscode/mcp.json)
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_DATABASE=neo4j
+
+# Local ports exposed on your machine
+NEO4J_HTTP_PORT=7474
+NEO4J_BOLT_PORT=7687
+```
 
 Load the env vars into your shell:
 
@@ -43,7 +54,7 @@ The helper script starts Neo4j and runs the import Cypher against the mounted CS
 - Properties may be updated on re-run
 - Relationships are recreated safely without duplication
 
-## 3) Open Neo4j Browser
+## 3) Schema validation using Neo4j Browser
 
 Open:
 
@@ -54,6 +65,14 @@ Login:
 
 - Username: `neo4j`
 - Password: `$NEO4J_PASSWORD`
+
+As a simple validation, in Neo4j Browser run the following Cypher query to visualize the graph schema:
+
+```
+CALL db.schema.visualization()
+```
+
+![neo4j-schema-validation](./images/neo4j-schema-validation.png)
 
 ## 4) Minimal validation queries
 
@@ -92,9 +111,11 @@ docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (i:Inci
 docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (r:AzureResource) RETURN count(r) AS resources;"
 ```
 
-## 5) Neo4j MCP server (VS Code)
+## 5) Starting Neo4j MCP server (VS Code)
 
-This repo configures the Neo4j MCP server in `.vscode/mcp.json`.
+This repo includes a VS Code MCP configuration in `.vscode/mcp.json` for the [`mcp-neo4j-cypher`](https://pypi.org/project/mcp-neo4j-cypher/) server. When enabled, agents can query the local Neo4j database through MCP tools (e.g., `read-neo4j-cypher`) instead of connecting to Neo4j directly.
+
+For non-agent contexts (CLI runs, scripts, automation), the project also supports querying Neo4j over the standard Neo4j HTTP/Bolt interfaces via the HTTP executor using the `NEO4J_*` environment variables.
 
 Important: VS Code must be launched from a shell that has `NEO4J_USERNAME`, `NEO4J_PASSWORD`, and `NEO4J_DATABASE` set (see `.env`).
 

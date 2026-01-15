@@ -1,8 +1,18 @@
 """Command-line interface for risk scoring."""
 
 import argparse
+import os
 import sys
+from datetime import date
 from typing import Optional
+
+from risk_scoring.engine import assess_resource_change
+from risk_scoring.evidence_client import CypherExecutor, EvidenceClient
+from risk_scoring.models import ResourceSpec
+from risk_scoring.neo4j_http import Neo4jHttpConfig, Neo4jHttpError
+from risk_scoring.neo4j_http_executor import Neo4jHttpExecutor
+from risk_scoring.neo4j_http_repository import Neo4jHttpEntityRepository
+from risk_scoring.scoring import ChangeContext
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -92,23 +102,56 @@ def main(argv: Optional[list] = None) -> int:
         )
     
     try:
-        # TODO: Wire Neo4j config and call engine (task iac-risk-scoring-ldt)
-        # This will be implemented in the next task
-        print(f"CLI parsed arguments successfully:", file=sys.stderr)
-        print(f"  Resource ID: {args.resource_id}", file=sys.stderr)
-        print(f"  Environment: {args.environment}", file=sys.stderr)
-        print(f"  Output format: {args.output_format}", file=sys.stderr)
-        print(f"  Output file: {args.output_file or 'stdout'}", file=sys.stderr)
-        print(f"  Use HTTP: {args.use_http}", file=sys.stderr)
-        print(f"  Verbose: {args.verbose}", file=sys.stderr)
+        # Initialize Neo4j executor
+        executor = _create_executor(use_http=args.use_http, verbose=args.verbose)
         
-        # Placeholder: Next task will wire up the actual engine call
-        print("\nNote: Engine integration pending (task iac-risk-scoring-ldt)", file=sys.stderr)
+        # Create repository and evidence client
+        if args.use_http or not _is_mcp_available():
+            # HTTP path requires config for repository too
+            config = Neo4jHttpConfig.from_env()
+            repo = Neo4jHttpEntityRepository(config)
+        else:
+            # MCP path: repository also needs to query Neo4j, use HTTP for now
+            # TODO: Consider MCP-based repository if needed
+            config = Neo4jHttpConfig.from_env()
+            repo = Neo4jHttpEntityRepository(config)
+        
+        evidence_client = EvidenceClient(executor)
+        
+        # Build inputs
+        resource_spec = ResourceSpec(resource_id=args.resource_id)
+        change_context = ChangeContext.create(environment=args.environment)
+        
+        # Run assessment
+        result = assess_resource_change(
+            repo=repo,
+            evidence_client=evidence_client,
+            resource=resource_spec,
+            change=change_context,
+            as_of=date.today(),
+            report_id=f"cli-{args.resource_id}-{args.environment}"
+        )
+        
+        # Output results
+        _write_output(result, args)
+        
         return 0
         
     except KeyboardInterrupt:
         print("\nInterrupted by user", file=sys.stderr)
         return 130  # Standard Unix exit code for SIGINT
+    
+    except Neo4jHttpError as e:
+        print(f"Neo4j configuration error: {e}", file=sys.stderr)
+        print("\nEnsure you have set the following environment variables:", file=sys.stderr)
+        print("  NEO4J_HTTP_URL (or NEO4J_HOST and NEO4J_HTTP_PORT)", file=sys.stderr)
+        print("  NEO4J_USERNAME (default: neo4j)", file=sys.stderr)
+        print("  NEO4J_PASSWORD (required)", file=sys.stderr)
+        print("  NEO4J_DATABASE (default: neo4j)", file=sys.stderr)
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 2  # Configuration error
         
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -116,6 +159,52 @@ def main(argv: Optional[list] = None) -> int:
             import traceback
             traceback.print_exc()
         return 1
+
+
+def _is_mcp_available() -> bool:
+    """Check if MCP Neo4j tools are available in this environment."""
+    # In a CLI context, MCP tools are typically not available
+    # This would only work in an agent/LLM context
+    return False
+
+
+def _create_executor(use_http: bool, verbose: bool) -> CypherExecutor:
+    """Create the appropriate CypherExecutor based on availability and flags."""
+    if use_http or not _is_mcp_available():
+        if verbose:
+            print("Using Neo4j HTTP executor", file=sys.stderr)
+        config = Neo4jHttpConfig.from_env()
+        return Neo4jHttpExecutor(config)
+    else:
+        # MCP path (not available in standalone CLI)
+        if verbose:
+            print("Using Neo4j MCP executor", file=sys.stderr)
+        from risk_scoring.mcp_executor import McpNeo4jExecutor
+        # This will raise an error in CLI context, which is expected
+        return McpNeo4jExecutor()
+
+
+def _write_output(result, args) -> None:
+    """Write the assessment result to the specified output."""
+    output_format = args.output_format
+    output_file = args.output_file
+    
+    # Determine what to write
+    if output_format == 'json':
+        content = result.report_json_string()
+    elif output_format == 'markdown':
+        content = result.report_markdown
+    else:  # both
+        content = f"# JSON Report\n\n```json\n{result.report_json_string()}\n```\n\n"
+        content += f"# Markdown Report\n\n{result.report_markdown}"
+    
+    # Write to file or stdout
+    if output_file:
+        with open(output_file, 'w') as f:
+            f.write(content)
+        print(f"Report written to {output_file}", file=sys.stderr)
+    else:
+        print(content)
 
 
 if __name__ == '__main__':

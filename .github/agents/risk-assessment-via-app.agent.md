@@ -1,6 +1,6 @@
 ---
 description: Assess operational risk for Azure resources using deterministic risk scoring engine
-name: Risk Assessment Agent
+name: Risk Assessment (via App)
 tools: ['vscode', 'execute', 'read', 'risk-scoring/*', 'edit', 'search', 'web', 'agent', 'todo']
 model: Claude Sonnet 4.5
 ---

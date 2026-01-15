@@ -236,7 +236,138 @@ python3 -m risk_scoring \
 
 Risk levels: LOW (0-39), MEDIUM (40-69), HIGH (70-100)
 
-## 7) Risk scoring from agents (MCP executor)
+## 7) FastAPI service (REST API)
+
+A FastAPI service provides a REST API wrapper around the risk scoring engine for programmatic access.
+
+### Starting the API Server
+
+```bash
+# Load environment variables
+export $(cat .env | xargs)
+
+# Start the server
+uvicorn api.main:app --reload --port 8000 --host 0.0.0.0
+```
+
+The API will be available at `http://localhost:8000` with interactive documentation at `/docs`.
+
+### API Endpoints
+
+**Health Check**
+```bash
+GET /health
+
+Response:
+{
+  "status": "ok",
+  "neo4j": "unknown"
+}
+```
+
+**Risk Assessment**
+```bash
+POST /api/v1/assess
+
+Request:
+{
+  "resource_id": "res-alpha-app",
+  "environment": "prod"
+}
+
+Response: Full risk report JSON (same structure as CLI JSON output)
+```
+
+### Example Usage
+
+**Using curl:**
+```bash
+curl -X POST http://localhost:8000/api/v1/assess \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resource_id": "res-alpha-app",
+    "environment": "dev"
+  }'
+```
+
+**Using Python requests:**
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/api/v1/assess",
+    json={
+        "resource_id": "res-alpha-app",
+        "environment": "prod"
+    }
+)
+
+report = response.json()
+print(f"Risk Score: {report['score']['risk_score']}")
+print(f"Risk Level: {report['score']['risk_level']}")
+```
+
+### Error Handling
+
+The API returns proper HTTP status codes:
+- **200 OK**: Successful assessment
+- **400 Bad Request**: Invalid resource ID or validation error
+- **500 Internal Server Error**: Neo4j connection failure or internal error
+
+Error responses follow this structure:
+```json
+{
+  "detail": {
+    "error": "error_type",
+    "message": "Human-readable message",
+    "detail": "Additional context"
+  }
+}
+```
+
+### Configuration
+
+The API uses the same environment variables as the CLI:
+- `NEO4J_HTTP_URL` (or `NEO4J_HOST` + `NEO4J_HTTP_PORT`)
+- `NEO4J_USERNAME` (default: `neo4j`)
+- `NEO4J_PASSWORD` (required)
+- `NEO4J_DATABASE` (default: `neo4j`)
+
+Additional API settings in `api/config.py`:
+- `api_title`: API title (default: "Risk Scoring API")
+- `api_version`: API version (default: "0.1.0")
+- `cors_origins`: CORS allowed origins (default: `["*"]` for local testing)
+
+### Architecture
+
+```
+┌──────────────┐
+│ HTTP Client  │  (curl, Python, GitHub Agent, etc.)
+└──────┬───────┘
+       │ POST /api/v1/assess
+       ▼
+┌──────────────┐
+│  FastAPI     │  api/main.py
+│  Service     │  - Request validation (Pydantic)
+│              │  - Error handling
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│ Risk Engine  │  risk_scoring package
+│              │  (same as CLI)
+└──────┬───────┘
+       │
+       ▼
+┌──────────────┐
+│   Neo4j      │  Graph database
+│   Graph      │  (HTTP executor)
+└──────────────┘
+```
+
+The API uses the same deterministic engine as the CLI, ensuring consistent results across different interfaces.
+
+## 8) Risk scoring from agents (MCP executor)
 
 For AI agents and LLMs with MCP support, the `McpNeo4jExecutor` provides direct access to Neo4j via the MCP server.
 
@@ -280,7 +411,7 @@ print(result.report_markdown)
 
 The CLI uses HTTP executor by default since MCP tools require agent infrastructure not available in standalone execution.
 
-## 8) Scripts overview
+## 9) Scripts overview
 
 ### `scripts/neo4j_up_and_import.sh`
 
@@ -325,7 +456,7 @@ Cypher script containing all import logic:
 
 This is the source of truth for the graph schema and data model.
 
-## 9) Natural-language risk questions (playbook)
+## 10) Natural-language risk questions (playbook)
 
 For brainstorming and smoke exploration of the Neo4j MCP server (read-only), see:
 

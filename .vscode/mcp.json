@@ -12,6 +12,12 @@
       "env": {
         "BEADS_WORKING_DIR": "${workspaceFolder}"
       }
+    },
+    "risk-scoring": {
+      "command": "${workspaceFolder}/.venv/bin/python3",
+      "args": ["-m", "risk_scoring.mcp_server"],
+      "cwd": "${workspaceFolder}/approach2-using-existing-graph",
+      "envFile": "${workspaceFolder}/approach2-using-existing-graph/.env"
     }
   }
 }

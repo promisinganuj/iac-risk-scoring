@@ -15,3 +15,6 @@ pytest
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 python-multipart>=0.0.12
+
+# MCP server framework for risk scoring MCP server
+mcp>=1.0.0

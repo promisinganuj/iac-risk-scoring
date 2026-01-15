@@ -13,6 +13,25 @@ You have access to the following MCP servers:
   - This MCP server allows to extract the graph database scheme to give the agent-LLM to generated Cypher queries to query and update the database.
   - You can use the following MCP Tools: `get-neo4j-schema`, `read-neo4j-cypher`, `write-neo4j-cypher`
 
+- **risk-scoring** (Risk Scoring MCP server)
+  - Primary interface for AI agents to assess operational risk for Azure resource changes
+  - Tool: `mcp_risk_scoring_assess_resource(resource_id: str, environment: str) -> JSON`
+  - Returns deterministic risk score (0-100) with evidence-based factors, blast radius, and recommendations
+  - Same engine as CLI and FastAPI interfaces - ensures consistent results
+  - **Usage**:
+    ```python
+    # Agent invokes MCP tool
+    result = mcp_risk_scoring_assess_resource(
+        resource_id="res-alpha-app",
+        environment="prod"  # prod|staging|dev|test
+    )
+    
+    # Returns JSON with risk_score, factors, evidence, recommendations
+    # Agent formats JSON as user-friendly markdown
+    ```
+  - **Agent workflow**: User asks → Agent calls MCP tool → Gets JSON → Formats markdown → User sees report
+  - See `.github/agents/risk-assessment.agent.md` for full agent instructions
+
 ## User interaction patters
 
 The user will interact in one of the following manners:

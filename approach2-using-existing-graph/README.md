@@ -367,49 +367,263 @@ Additional API settings in `api/config.py`:
 
 The API uses the same deterministic engine as the CLI, ensuring consistent results across different interfaces.
 
-## 8) Risk scoring from agents (MCP executor)
+## 8) Risk Scoring MCP Server
 
-For AI agents and LLMs with MCP support, the `McpNeo4jExecutor` provides direct access to Neo4j via the MCP server.
+The Risk Scoring MCP Server exposes the risk scoring engine as an MCP tool for AI agents, providing the primary interface for agent-based risk assessments in GitHub workflows and VS Code.
 
-### Agent Usage
+**Three interfaces, one engine:**
+- **CLI**: Human terminal interaction  
+- **FastAPI**: HTTP clients, CI/CD pipelines, webhooks, monitoring dashboards
+- **MCP Server**: AI agents (GitHub, VS Code) - **PRIMARY AGENT INTERFACE**
 
-```python
-from risk_scoring.mcp_executor import McpNeo4jExecutor
-from risk_scoring.evidence_client import EvidenceClient
-from risk_scoring.engine import assess_resource_change
-from risk_scoring.models import ResourceSpec
-from risk_scoring.scoring import ChangeContext
+All three use the same deterministic `assess_resource_change()` engine, ensuring consistent risk scores across interfaces.
 
-# In agent context, mcp_tool_function is available
-def mcp_neo4j_query(query, params):
-    # Agent invokes MCP tool: mcp_neo4j-databas_read_neo4j_cypher
-    return mcp_tool_result
+### Agent Workflow
 
-# Create MCP executor (no credentials needed)
-executor = McpNeo4jExecutor(mcp_tool_function=mcp_neo4j_query)
-evidence_client = EvidenceClient(executor)
-
-# Run risk assessment (repository needs HTTP executor)
-result = assess_resource_change(
-    repo=repo,  # Use HTTP-based repository
-    evidence_client=evidence_client,
-    resource=ResourceSpec(resource_id="res-alpha-app"),
-    change=ChangeContext.create(environment="prod")
-)
-
-print(result.report_markdown)
+```
+User → "What's the risk for res-alpha-app in prod?"
+     ↓
+Agent → mcp_risk_scoring_assess_resource(resource_id="res-alpha-app", environment="prod")
+     ↓
+MCP Server → engine.assess_resource_change() → JSON report
+     ↓
+Agent ← JSON (risk_score, factors, evidence, recommendations)
+     ↓
+Agent → Formats JSON as user-friendly markdown
+     ↓
+User ← "Risk Score: 45/100 (MEDIUM)
+        Production environment: +20 points
+        Recent incidents: 4 in last 180 days (+15 points)
+        ..."
 ```
 
-### MCP vs HTTP Executor
+### Starting the MCP Server
 
-| Feature | MCP Executor | HTTP Executor |
-|---------|--------------|---------------|
-| **Use Case** | AI agent/LLM contexts | Standalone CLI, automation scripts |
-| **Credentials** | Not required (MCP handles auth) | Requires NEO4J_* env vars |
-| **Availability** | Agent runtime only | Always available |
-| **CLI Default** | No (requires MCP infrastructure) | Yes |
+The MCP server is automatically started by VS Code when configured in `.vscode/mcp.json`.
 
-The CLI uses HTTP executor by default since MCP tools require agent infrastructure not available in standalone execution.
+**Prerequisites:**
+1. Neo4j must be running: `./scripts/neo4j_up_and_import.sh`
+2. Environment variables set in `approach2-using-existing-graph/.env`
+3. VS Code launched from shell with env vars loaded:
+   ```bash
+   cd approach2-using-existing-graph
+   set -a; source .env; set +a
+   cd ..
+   code .
+   ```
+
+**Configuration** (already set in `.vscode/mcp.json`):
+```json
+{
+  "servers": {
+    "risk-scoring": {
+      "command": "python3",
+      "args": ["-m", "risk_scoring.mcp_server"],
+      "cwd": "${workspaceFolder}/approach2-using-existing-graph",
+      "envFile": "${workspaceFolder}/approach2-using-existing-graph/.env"
+    }
+  }
+}
+```
+
+After configuration, restart the MCP server in VS Code (MCP status indicator → "risk-scoring" → Restart).
+
+### MCP Tool Interface
+
+**Tool Name**: `assess_resource`
+
+**Parameters**:
+```json
+{
+  "resource_id": "res-alpha-app",  // Required: Azure resource ID from Neo4j
+  "environment": "prod"             // Required: prod|staging|dev|test
+}
+```
+
+**Returns**: Full JSON risk report (same structure as CLI `--output-format json`)
+
+```json
+{
+  "report_id": "...",
+  "resolved_entity": {
+    "resource_id": "res-alpha-app",
+    "resource_type": "...",
+    "service_id": "...",
+    "display_name": "..."
+  },
+  "evidence": {
+    "service_context": {...},
+    "incidents": [...],
+    "deployments": [...],
+    "dependencies": {...}
+  },
+  "score": {
+    "risk_score": 45,
+    "risk_level": "MEDIUM",
+    "factors": [
+      {"factor": "production_environment", "points": 20, "reason": "..."},
+      {"factor": "recent_incidents", "points": 15, "reason": "..."}
+    ]
+  },
+  "recommendations": {
+    "verdict": "PROCEED_WITH_CAUTION",
+    "actions": ["Review change during team sync", "..."],
+    "unknowns": ["..."]
+  }
+}
+```
+
+### Agent Usage Example
+
+From an AI agent context (e.g., `.github/agents/risk-assessment.agent.md`):
+
+```python
+# Agent invokes MCP tool
+result = mcp_risk_scoring_assess_resource(
+    resource_id="res-alpha-app",
+    environment="prod"
+)
+
+# result is a JSON dict - agent formats for user
+risk_score = result["score"]["risk_score"]
+risk_level = result["score"]["risk_level"]
+verdict = result["recommendations"]["verdict"]
+
+# Agent presents formatted markdown to user
+print(f"""
+# Risk Assessment: {result["resolved_entity"]["display_name"]}
+
+## Summary
+- **Risk Score**: {risk_score}/100 ({risk_level})
+- **Verdict**: {verdict}
+
+## Risk Factors
+{format_factors(result["score"]["factors"])}
+
+## Recommendations
+{format_recommendations(result["recommendations"]["actions"])}
+""")
+```
+
+### Error Handling
+
+The MCP server returns structured error responses for graceful agent handling:
+
+**Resource Not Found** (`not_found`):
+```json
+{
+  "error": "not_found",
+  "message": "Resource 'xyz-123' not found in Neo4j graph",
+  "detail": "The resource may not exist or hasn't been ingested yet",
+  "success": false
+}
+```
+
+**Ambiguous Match** (`ambiguous_match`):
+```json
+{
+  "error": "ambiguous_match",
+  "message": "Multiple resources match 'app-01'",
+  "detail": "Please specify the full resource ID.\nMatching resources:\n  - res-alpha-app-01 (service: alpha)\n  - res-beta-app-01 (service: beta)",
+  "success": false
+}
+```
+
+**Database Connection Error** (`database_error`):
+```json
+{
+  "error": "database_error",
+  "message": "Failed to connect to Neo4j database",
+  "detail": "Connection refused...\n\nTroubleshooting:\n1. Check if Neo4j container is running...",
+  "success": false
+}
+```
+
+**Validation Error** (`validation_error`):
+```json
+{
+  "error": "validation_error",
+  "message": "Invalid environment 'production'",
+  "detail": "Please check your input parameters and try again",
+  "success": false
+}
+```
+
+Agents should check for `error` field in response and handle gracefully with user-friendly messages.
+
+### Configuration
+
+The MCP server uses the same environment variables as CLI and FastAPI:
+
+**Required**:
+- `NEO4J_PASSWORD`: Neo4j database password
+
+**Optional** (with defaults):
+- `NEO4J_HTTP_URL`: Neo4j HTTP endpoint (default: `http://localhost:7474`)
+- `NEO4J_USERNAME`: Database username (default: `neo4j`)
+- `NEO4J_DATABASE`: Database name (default: `neo4j`)
+
+These are loaded from `approach2-using-existing-graph/.env` via the `envFile` config in `.vscode/mcp.json`.
+
+### Architecture
+
+```
+┌──────────────┐
+│  AI Agent    │  GitHub agent, VS Code agent
+│  (User asks) │  "What's the risk for res-alpha-app?"
+└──────┬───────┘
+       │ MCP protocol
+       ▼
+┌──────────────┐
+│ MCP Server   │  risk_scoring.mcp_server
+│ assess_      │  - Input validation
+│  resource    │  - Error handling
+└──────┬───────┘
+       │ Python call
+       ▼
+┌──────────────┐
+│ Risk Engine  │  risk_scoring.engine
+│ assess_      │  1. Entity Resolution
+│  resource_   │  2. Evidence Gathering
+│  change()    │  3. Deterministic Scoring
+│              │  4. Report Generation
+└──────┬───────┘
+       │ HTTP
+       ▼
+┌──────────────┐
+│   Neo4j      │  Graph database
+│   Graph      │  (sample data: services, incidents, resources)
+└──────────────┘
+```
+
+The MCP server is a thin wrapper around the core engine, providing agent-friendly interface with structured errors and JSON responses that agents format into user-friendly markdown.
+
+### Testing the MCP Server
+
+**From VS Code agent:**
+1. Ensure Neo4j is running and MCP server is started
+2. Ask the agent: "What's the risk of changing res-alpha-app in production?"
+3. Agent should invoke `assess_resource` and present formatted report
+
+**Manual testing** (requires agent context - cannot run standalone):
+- The MCP server requires MCP protocol infrastructure (stdio communication)
+- Use CLI for standalone testing: `python3 -m risk_scoring --resource-id res-alpha-app --environment prod`
+- Use FastAPI for HTTP testing: `curl -X POST http://localhost:8000/api/v1/assess -d '{"resource_id":"res-alpha-app","environment":"prod"}'`
+
+### Comparison: CLI vs FastAPI vs MCP
+
+| Feature | CLI | FastAPI | MCP Server |
+|---------|-----|---------|------------|
+| **Primary Use** | Human terminal | CI/CD, webhooks, dashboards | AI agents |
+| **Interface** | Command-line args | HTTP REST API | MCP protocol (stdio) |
+| **Output** | Markdown or JSON | JSON | JSON |
+| **Auth** | Env vars | Env vars | Env vars (via envFile) |
+| **Availability** | Always | When server running | When MCP server running |
+| **Testing** | `python3 -m risk_scoring` | `curl http://localhost:8000` | Agent invocation |
+| **Error Format** | Text/exit codes | HTTP status + JSON | Structured JSON |
+
+All three use the **same deterministic engine** (`assess_resource_change`), ensuring consistent risk scores and recommendations regardless of interface.
+
 
 ## 9) Scripts overview
 

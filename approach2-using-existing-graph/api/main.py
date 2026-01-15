@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.config import settings
 from api.models import AssessmentRequest, ErrorResponse, HealthResponse
 from risk_scoring.engine import assess_resource_change
+from risk_scoring.errors import NotFoundError, AmbiguousMatchError, ResolutionError
 from risk_scoring.evidence_client import EvidenceClient
 from risk_scoring.models import ResourceSpec
 from risk_scoring.neo4j_http import Neo4jHttpConfig, Neo4jHttpError
@@ -126,6 +127,36 @@ async def assess_resource(request: AssessmentRequest):
         # Return JSON report
         return result.report_json
         
+    except NotFoundError as e:
+        # Resource not found in graph
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "resource_not_found",
+                "message": str(e),
+                "detail": None
+            }
+        )
+    except AmbiguousMatchError as e:
+        # Multiple matching resources found
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "ambiguous_resource",
+                "message": str(e),
+                "detail": f"Found {len(e.candidates)} candidates" if hasattr(e, 'candidates') else None
+            }
+        )
+    except ResolutionError as e:
+        # Other resolution errors
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "resolution_error",
+                "message": str(e),
+                "detail": None
+            }
+        )
     except Neo4jHttpError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

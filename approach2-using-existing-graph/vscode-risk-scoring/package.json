@@ -1,0 +1,57 @@
+{
+    "name": "vscode-risk-scoring",
+    "displayName": "IaC Risk Scoring (Approach 2)",
+    "description": "VS Code triggers for deterministic IaC risk scoring (Approach 2).",
+    "version": "0.0.1",
+    "publisher": "local",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "iacRiskScoring.assessInfrastructureChange",
+                "title": "Risk: Assess Infrastructure Change"
+            },
+            {
+                "command": "iacRiskScoring.renderRiskReport",
+                "title": "Risk: Render Risk Report"
+            }
+        ],
+        "menus": {
+            "explorer/context": [
+                {
+                    "command": "iacRiskScoring.assessInfrastructureChange",
+                    "when": "resourceScheme == 'file'",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "iacRiskScoring.renderRiskReport",
+                    "when": "resourceScheme == 'file' && resourceExtname == '.json'",
+                    "group": "navigation@2"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "iacRiskScoring.renderRiskReport",
+                    "when": "resourceExtname == '.json'",
+                    "group": "navigation@2"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "compile": "node node_modules/typescript/bin/tsc -p .",
+        "watch": "node node_modules/typescript/bin/tsc -p . -w",
+        "package": "vsce package"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.30",
+        "@types/vscode": "^1.85.0",
+        "typescript": "^5.4.5"
+    }
+}

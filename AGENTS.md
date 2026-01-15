@@ -13,6 +13,14 @@ You have access to the following MCP servers:
   - This MCP server allows to extract the graph database scheme to give the agent-LLM to generated Cypher queries to query and update the database.
   - You can use the following MCP Tools: `get-neo4j-schema`, `read-neo4j-cypher`, `write-neo4j-cypher`
 
+## User interaction patters
+
+The user will interact in one of the following manners:
+
+1. **Generic queries**: User asks generic queries about the repo/code. You can answer those as a normal conversation.
+2. **Planning related**: User wants to brainstorm some ideas and create a plan for the implementation. For this, use the `beads` MCP tools to create/update/delete beads tasks. Ask before implementing anything.
+3. **Implementation related**: User wants to implement certain beads tasks. Please feel free to use any tools as required. 
+
 ## Working Agreement (Beads-First)
 
 Beads issues are the source of truth. Before implementation starts, the issue should include:

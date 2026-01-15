@@ -67,76 +67,198 @@ def _json_block(value: Any) -> str:
 
 
 def render_markdown_report(report: Mapping[str, Any], *, max_sample_rows: int = 5) -> str:
-    """Render a stable Markdown report from the JSON payload."""
+    """Render a stable Markdown report from the JSON payload optimized for agents."""
 
     schema_version = report.get("schema_version")
     score = report.get("score") or {}
     factors = score.get("factors") or []
+    risk_score = score.get("risk_score", 0)
+    risk_level = score.get("risk_level", "UNKNOWN")
 
     lines: List[str] = []
-    lines.append("# IaC Risk Report")
+    lines.append("# Risk Assessment Report")
     lines.append("")
-    lines.append("## Summary")
-    lines.append(f"- schema_version: {schema_version}")
-    lines.append(f"- risk_model_version: {score.get('risk_model_version')}")
-    lines.append(f"- risk_score: {score.get('risk_score')}")
-    lines.append(f"- risk_level: {score.get('risk_level')}")
+    
+    # Prominent risk summary for agents
+    lines.append("## 🎯 Risk Summary")
+    lines.append("")
+    lines.append(f"**Risk Score**: {risk_score}/100")
+    lines.append(f"**Risk Level**: {risk_level}")
+    lines.append(f"**Verdict**: {_get_verdict(risk_level, risk_score)}")
+    lines.append("")
+    lines.append(f"*Schema Version*: {schema_version}")
+    lines.append(f"*Risk Model*: {score.get('risk_model_version')}")
+    lines.append("")
 
+    # Resource information
     resource = report.get("resource") or {}
-    lines.append("")
-    lines.append("## Resource")
-    lines.append(f"- label: {resource.get('label')}")
-    lines.append(f"- resource_id: {resource.get('resource_id')}")
-
     change = report.get("change") or {}
+    lines.append("## 📋 Resource Information")
     lines.append("")
-    lines.append("## Change")
-    lines.append(f"- environment: {change.get('environment')}")
+    lines.append(f"- **Resource ID**: `{resource.get('resource_id')}`")
+    lines.append(f"- **Type**: {resource.get('label')}")
+    lines.append(f"- **Environment**: {change.get('environment')}")
     ops = change.get("operations") or []
-    lines.append(f"- operations: {', '.join(ops) if ops else '(none)'}")
-
+    lines.append(f"- **Operations**: {', '.join(ops) if ops else 'None'}")
     lines.append("")
-    lines.append("## Factors")
-    for f in factors:
-        lines.append(f"### {f.get('factor_id')}: {f.get('title')}")
-        lines.append(f"- status: {f.get('status')}")
-        lines.append(f"- points: {f.get('points')} / {f.get('max_points')}")
-        lines.append(f"- reason: {f.get('reason')}")
-        lines.append("- evidence:")
-        lines.append("```json")
-        lines.append(_json_block(f.get("evidence") or {}))
-        lines.append("```")
-        lines.append("")
 
+    # Risk factors in table format
+    lines.append("## ⚠️ Risk Factors")
+    lines.append("")
+    lines.append("| Factor | Status | Points | Impact |")
+    lines.append("|--------|--------|--------|--------|")
+    for f in factors:
+        status_emoji = _get_status_emoji(f.get('status'))
+        factor_name = f.get('title', 'Unknown')
+        status = f.get('status', 'unknown')
+        points = f"{f.get('points', 0)}/{f.get('max_points', 0)}"
+        impact = _get_impact_level(f.get('points', 0), f.get('max_points', 1))
+        lines.append(f"| {status_emoji} {factor_name} | {status} | {points} | {impact} |")
+    lines.append("")
+    
+    # Detailed factor explanations
+    lines.append("### Factor Details")
+    lines.append("")
+    for f in factors:
+        status_emoji = _get_status_emoji(f.get('status'))
+        lines.append(f"**{status_emoji} {f.get('factor_id')}: {f.get('title')}**")
+        lines.append("")
+        lines.append(f"- **Status**: {f.get('status')}")
+        lines.append(f"- **Points**: {f.get('points')} / {f.get('max_points')}")
+        lines.append(f"- **Reason**: {f.get('reason')}")
+        lines.append("")
+        evidence_val = f.get("evidence") or {}
+        if evidence_val:
+            lines.append("Evidence:")
+            lines.append("```json")
+            lines.append(_json_block(evidence_val))
+            lines.append("```")
+            lines.append("")
+
+    # Recommendations based on risk level and factors
+    lines.append("## 💡 Recommendations")
+    lines.append("")
+    recommendations = _generate_recommendations(risk_level, risk_score, factors, report.get("unknowns") or [])
+    for rec in recommendations:
+        lines.append(f"- {rec}")
+    lines.append("")
+
+    # Supporting evidence summary
     evidence = report.get("evidence") or {}
-    lines.append("## Evidence")
+    lines.append("## 📊 Supporting Evidence")
+    lines.append("")
     lines.append("```json")
     lines.append(_json_block(evidence))
     lines.append("```")
 
     lines.append("")
-    lines.append("## Evidence Queries")
+    lines.append("## 🔍 Evidence Queries")
+    lines.append("")
     for q in report.get("evidence_queries") or []:
         lines.append(f"### {q.get('query_id')}")
-        lines.append(f"- row_count: {q.get('row_count')}")
-        lines.append("- params:")
+        lines.append(f"- **Rows returned**: {q.get('row_count')}")
+        lines.append("- **Parameters**:")
         lines.append("```json")
         lines.append(_json_block(q.get("params") or {}))
         lines.append("```")
         sample_rows = list(q.get("sample_rows") or [])[:max_sample_rows]
-        lines.append(f"- sample_rows (first {len(sample_rows)}):")
-        lines.append("```json")
-        lines.append(_json_block(sample_rows))
-        lines.append("```")
+        if sample_rows:
+            lines.append(f"- **Sample rows** (first {len(sample_rows)}):")
+            lines.append("```json")
+            lines.append(_json_block(sample_rows))
+            lines.append("```")
         lines.append("")
 
     unknowns = report.get("unknowns") or []
-    lines.append("## Unknowns")
+    lines.append("## ❓ Unknowns")
+    lines.append("")
     if unknowns:
+        lines.append("The following data points were not available for this assessment:")
+        lines.append("")
         for u in unknowns:
             lines.append(f"- {u}")
     else:
-        lines.append("- (none)")
+        lines.append("*All required data points were available.*")
 
     lines.append("")
     return "\n".join(lines)
+
+
+def _get_verdict(risk_level: str, risk_score: int) -> str:
+    """Generate a verdict based on risk level."""
+    if risk_level == "HIGH":
+        return "⛔ High risk - Review carefully before proceeding"
+    elif risk_level == "MEDIUM":
+        return "⚠️ Moderate risk - Proceed with caution"
+    elif risk_level == "LOW":
+        return "✅ Low risk - Safe to proceed"
+    else:
+        return "❓ Unable to assess risk"
+
+
+def _get_status_emoji(status: str) -> str:
+    """Get emoji for factor status."""
+    status_map = {
+        "hit": "🔴",
+        "miss": "🟢",
+        "unknown": "❓",
+        "na": "⚪"
+    }
+    return status_map.get(status, "❓")
+
+
+def _get_impact_level(points: int, max_points: int) -> str:
+    """Determine impact level from points."""
+    if max_points == 0:
+        return "None"
+    ratio = points / max_points
+    if ratio >= 0.7:
+        return "High"
+    elif ratio >= 0.4:
+        return "Medium"
+    elif ratio > 0:
+        return "Low"
+    else:
+        return "None"
+
+
+def _generate_recommendations(risk_level: str, risk_score: int, factors: List[Dict[str, Any]], unknowns: List[str]) -> List[str]:
+    """Generate actionable recommendations based on risk assessment."""
+    recommendations = []
+    
+    # Risk level specific recommendations
+    if risk_level == "HIGH":
+        recommendations.append("**Immediate attention required**: This change carries high risk")
+        recommendations.append("Consider implementing this change during a maintenance window")
+        recommendations.append("Ensure rollback procedures are tested and ready")
+        recommendations.append("Notify stakeholders and on-call teams before deployment")
+    elif risk_level == "MEDIUM":
+        recommendations.append("**Review recommended**: This change has moderate risk")
+        recommendations.append("Verify recent deployment history before proceeding")
+        recommendations.append("Have rollback plan ready")
+    else:
+        recommendations.append("This change appears safe to proceed")
+        recommendations.append("Follow standard deployment procedures")
+    
+    # Factor-specific recommendations
+    for f in factors:
+        factor_id = f.get('factor_id', '')
+        status = f.get('status')
+        points = f.get('points', 0)
+        
+        if status == 'hit' and points > 0:
+            if 'production' in factor_id:
+                recommendations.append("Production environment - Extra caution advised")
+            elif 'blast_radius' in factor_id:
+                recommendations.append("Multiple services affected - Coordinate with service owners")
+            elif 'outages' in factor_id:
+                recommendations.append("Recent outages detected - Review incident history")
+            elif 'icms' in factor_id:
+                recommendations.append("Open incidents exist - Check for related issues")
+    
+    # Unknowns recommendations
+    if unknowns:
+        recommendations.append(f"⚠️ Missing {len(unknowns)} data point(s) - Risk assessment may be incomplete")
+        recommendations.append("Consider gathering missing data before high-risk deployments")
+    
+    return recommendations

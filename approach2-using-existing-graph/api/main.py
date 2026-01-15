@@ -38,11 +38,36 @@ async def health_check() -> HealthResponse:
     Health check endpoint.
     
     Returns service status and Neo4j connection status.
+    Tests actual connectivity to Neo4j database.
     """
-    # TODO: Implement actual Neo4j connection check
+    neo4j_status = "unknown"
+    
+    try:
+        # Try to create Neo4j config and executor
+        config = Neo4jHttpConfig.from_env()
+        executor = Neo4jHttpExecutor(config)
+        
+        # Execute a simple query to verify connectivity
+        # Use a lightweight query that doesn't require specific data
+        result = executor.run_readonly(
+            "RETURN 1 as test",
+            {}
+        )
+        
+        # If we got here without exception, connection is working
+        if result and len(result) > 0:
+            neo4j_status = "connected"
+        else:
+            neo4j_status = "connected (no data)"
+            
+    except Neo4jHttpError as e:
+        neo4j_status = f"error: {str(e)[:50]}"  # Truncate long error messages
+    except Exception as e:
+        neo4j_status = f"error: {str(e)[:50]}"
+    
     return HealthResponse(
         status="ok",
-        neo4j="unknown"  # Will be implemented in next task
+        neo4j=neo4j_status
     )
 
 

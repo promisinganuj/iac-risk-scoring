@@ -1,0 +1,122 @@
+[
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/payments",
+        "serviceArtifacts": [
+            "webhook-service",
+            "payment-worker"
+        ],
+        "applicationCode": "Node.js/Express",
+        "iacConfiguration": "Terraform/rg-alpha-core"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/beta-retail",
+        "serviceArtifacts": [
+            "checkout-api",
+            "inventory-sync"
+        ],
+        "applicationCode": "Java/SpringBoot",
+        "iacConfiguration": "Bicep/rg-beta-api"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/gamma-data",
+        "serviceArtifacts": [
+            "model-trainer",
+            "feature-store"
+        ],
+        "applicationCode": "Python/PyTorch",
+        "iacConfiguration": "Terragrunt/rg-gamma-analytics"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/delta-core",
+        "serviceArtifacts": [
+            "control-plane",
+            "auth-service"
+        ],
+        "applicationCode": "Go/micro",
+        "iacConfiguration": "Bicep/rg-delta-platform"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/omega-msg",
+        "serviceArtifacts": [
+            "relay",
+            "event-proxy"
+        ],
+        "applicationCode": "Scala/Akka",
+        "iacConfiguration": "Terraform/rg-omega-messaging"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/lambda-id",
+        "serviceArtifacts": [
+            "identity-gateway",
+            "policy-service"
+        ],
+        "applicationCode": "C#/.NET",
+        "iacConfiguration": "Bicep/rg-lambda-id"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/phi-health",
+        "serviceArtifacts": [
+            "patient-api",
+            "reporting"
+        ],
+        "applicationCode": "Python/Django",
+        "iacConfiguration": "Terragrunt/rg-phi-health"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/kappa-ads",
+        "serviceArtifacts": [
+            "event-hub-ingest",
+            "bidder"
+        ],
+        "applicationCode": "Java/Quarkus",
+        "iacConfiguration": "Terraform/rg-kappa-ads"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/zeta-commerce",
+        "serviceArtifacts": [
+            "product-catalog",
+            "order-processor"
+        ],
+        "applicationCode": "JavaScript/Node",
+        "iacConfiguration": "Bicep/rg-zeta-commerce"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/theta-logs",
+        "serviceArtifacts": [
+            "log-collector",
+            "alerting"
+        ],
+        "applicationCode": "Go/Logrus",
+        "iacConfiguration": "Terragrunt/rg-theta-observability"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/sigma-collab",
+        "serviceArtifacts": [
+            "video-service",
+            "chat-service"
+        ],
+        "applicationCode": "TypeScript/React",
+        "iacConfiguration": "Bicep/rg-sigma-collab"
+    },
+    {
+        "sourceControlType": "GitHub",
+        "sourceControlURI": "https://github.com/contoso/tau-observ",
+        "serviceArtifacts": [
+            "event-map",
+            "metrics-pipeline"
+        ],
+        "applicationCode": "Python/Flask",
+        "iacConfiguration": "Terraform/rg-tau-observability"
+    }
+]

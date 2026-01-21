@@ -1,0 +1,110 @@
+[
+    {
+        "rolloutId": "RL-2025-101",
+        "serviceId": "A56C6700-6666-4444-AAAA-000F3B9CC999",
+        "serviceGroup": "Finance",
+        "rolloutInfra": "AKS-eastus2-v4",
+        "artifactVersion": "2025.3.1",
+        "resourceGroup": "rg-alpha-core",
+        "subscriptionId": "subs-prod-001"
+    },
+    {
+        "rolloutId": "RL-2025-102",
+        "serviceId": "B77D8800-7777-5555-BBBB-001F4C9DD888",
+        "serviceGroup": "RetailOps",
+        "rolloutInfra": "AppService-centralus-2",
+        "artifactVersion": "2025.2.8",
+        "resourceGroup": "rg-beta-api",
+        "subscriptionId": "subs-prod-002"
+    },
+    {
+        "rolloutId": "RL-2025-103",
+        "serviceId": "C88E9900-8888-6666-CCCC-002F5D9EE777",
+        "serviceGroup": "DataScience",
+        "rolloutInfra": "Databricks-eastus2",
+        "artifactVersion": "2025.4.0",
+        "resourceGroup": "rg-gamma-analytics",
+        "subscriptionId": "subs-prod-003"
+    },
+    {
+        "rolloutId": "RL-2025-104",
+        "serviceId": "D99FA000-9999-7777-DDDD-003F6E9FF666",
+        "serviceGroup": "PlatformCore",
+        "rolloutInfra": "AKS-westus2-v3",
+        "artifactVersion": "2025.1.5",
+        "resourceGroup": "rg-delta-platform",
+        "subscriptionId": "subs-prod-001"
+    },
+    {
+        "rolloutId": "RL-2025-105",
+        "serviceId": "F12A1100-1111-8888-EEEE-004F7FA0AA55",
+        "serviceGroup": "Messaging",
+        "rolloutInfra": "EventHub-eastus-standard",
+        "artifactVersion": "2025.1.12",
+        "resourceGroup": "rg-omega-messaging",
+        "subscriptionId": "subs-prod-002"
+    },
+    {
+        "rolloutId": "RL-2025-106",
+        "serviceId": "0ABC2200-2222-9999-FFFF-005F8FA1BB44",
+        "serviceGroup": "Identity",
+        "rolloutInfra": "AAD-automation",
+        "artifactVersion": "2025.3.4",
+        "resourceGroup": "rg-lambda-id",
+        "subscriptionId": "subs-prod-004"
+    },
+    {
+        "rolloutId": "RL-2025-107",
+        "serviceId": "1BCD3300-3333-AAAB-EEEE-006F9FB2CC33",
+        "serviceGroup": "Healthcare",
+        "rolloutInfra": "SQLFailover-centralus",
+        "artifactVersion": "2025.2.1",
+        "resourceGroup": "rg-phi-health",
+        "subscriptionId": "subs-prod-003"
+    },
+    {
+        "rolloutId": "RL-2025-108",
+        "serviceId": "2CDE4400-4444-BBBB-FFFF-007FABF3DD22",
+        "serviceGroup": "Advertising",
+        "rolloutInfra": "EventGrid-eastus2",
+        "artifactVersion": "2025.3.2",
+        "resourceGroup": "rg-kappa-ads",
+        "subscriptionId": "subs-prod-005"
+    },
+    {
+        "rolloutId": "RL-2025-109",
+        "serviceId": "3DEF5500-5555-CCCC-AAAA-008FBCF4EE11",
+        "serviceGroup": "Commerce",
+        "rolloutInfra": "CosmosDB-centralus",
+        "artifactVersion": "2025.1.9",
+        "resourceGroup": "rg-zeta-commerce",
+        "subscriptionId": "subs-prod-002"
+    },
+    {
+        "rolloutId": "RL-2025-110",
+        "serviceId": "4EFA6600-6666-DDDD-BBBB-009FCD045F00",
+        "serviceGroup": "Observability",
+        "rolloutInfra": "Storage-eastus",
+        "artifactVersion": "2025.2.6",
+        "resourceGroup": "rg-theta-observability",
+        "subscriptionId": "subs-prod-004"
+    },
+    {
+        "rolloutId": "RL-2025-111",
+        "serviceId": "5F0A7700-7777-EEEE-CCCC-00AFDE156FEE",
+        "serviceGroup": "Collaboration",
+        "rolloutInfra": "AppService-westus",
+        "artifactVersion": "2025.4.1",
+        "resourceGroup": "rg-sigma-collab",
+        "subscriptionId": "subs-dev-001"
+    },
+    {
+        "rolloutId": "RL-2025-112",
+        "serviceId": "6A1B8800-8888-FFFF-DDDD-00BFED267FDD",
+        "serviceGroup": "Observability",
+        "rolloutInfra": "FunctionApp-eastus2",
+        "artifactVersion": "2025.5.0",
+        "resourceGroup": "rg-tau-observability",
+        "subscriptionId": "subs-prod-005"
+    }
+]

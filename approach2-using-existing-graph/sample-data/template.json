@@ -1,0 +1,121 @@
+[
+    {
+        "templateVersion": "1.0",
+        "templateName": "alpha-core-web",
+        "resourceGroup": "rg-alpha-core",
+        "resourceType": "Microsoft.Web/sites",
+        "properties": {
+            "sku": "S1",
+            "runtime": "node"
+        }
+    },
+    {
+        "templateVersion": "1.1",
+        "templateName": "beta-api",
+        "resourceGroup": "rg-beta-api",
+        "resourceType": "Microsoft.Web/sites",
+        "properties": {
+            "sku": "P1v2",
+            "runtime": "dotnet"
+        }
+    },
+    {
+        "templateVersion": "2.0",
+        "templateName": "gamma-lake",
+        "resourceGroup": "rg-gamma-analytics",
+        "resourceType": "Microsoft.Storage/storageAccounts",
+        "properties": {
+            "tier": "Standard",
+            "replication": "ZRS"
+        }
+    },
+    {
+        "templateVersion": "3.2",
+        "templateName": "delta-platform",
+        "resourceGroup": "rg-delta-platform",
+        "resourceType": "Microsoft.ContainerService/managedClusters",
+        "properties": {
+            "nodeCount": "3",
+            "vmSize": "Standard_D4"
+        }
+    },
+    {
+        "templateVersion": "1.4",
+        "templateName": "omega-messaging",
+        "resourceGroup": "rg-omega-messaging",
+        "resourceType": "Microsoft.EventHub/namespaces",
+        "properties": {
+            "sku": "Standard",
+            "capacity": "2"
+        }
+    },
+    {
+        "templateVersion": "1.0",
+        "templateName": "lambda-identity",
+        "resourceGroup": "rg-lambda-id",
+        "resourceType": "Microsoft.AAD/domainServices",
+        "properties": {
+            "dnsName": "lambda.contoso.com",
+            "sku": "Standard"
+        }
+    },
+    {
+        "templateVersion": "2.1",
+        "templateName": "phi-health-db",
+        "resourceGroup": "rg-phi-health",
+        "resourceType": "Microsoft.Sql/servers/databases",
+        "properties": {
+            "collation": "SQL_Latin1_General_CP1_CI_AS",
+            "backupDaily": "true"
+        }
+    },
+    {
+        "templateVersion": "1.3",
+        "templateName": "kappa-ads-event",
+        "resourceGroup": "rg-kappa-ads",
+        "resourceType": "Microsoft.EventGrid/namespaces",
+        "properties": {
+            "topics": "billing|clicks"
+        }
+    },
+    {
+        "templateVersion": "2.2",
+        "templateName": "zeta-commerce-db",
+        "resourceGroup": "rg-zeta-commerce",
+        "resourceType": "Microsoft.DocumentDB/databaseAccounts",
+        "properties": {
+            "consistency": "Session",
+            "multiRegion": "true"
+        }
+    },
+    {
+        "templateVersion": "1.5",
+        "templateName": "theta-logs-storage",
+        "resourceGroup": "rg-theta-observability",
+        "resourceType": "Microsoft.Storage/storageAccounts",
+        "properties": {
+            "tier": "Premium",
+            "accessTier": "Hot"
+        }
+    },
+    {
+        "templateVersion": "1.0",
+        "templateName": "sigma-collab",
+        "resourceGroup": "rg-sigma-collab",
+        "resourceType": "Microsoft.Web/sites",
+        "properties": {
+            "sku": "S1",
+            "stack": "dotnet"
+        }
+    },
+    {
+        "templateVersion": "1.0",
+        "templateName": "tau-observ-func",
+        "resourceGroup": "rg-tau-observability",
+        "resourceType": "Microsoft.Web/sites",
+        "properties": {
+            "functions": "3",
+            "runtime": "python"
+        }
+    }
+]

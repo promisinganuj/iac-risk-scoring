@@ -1,0 +1,173 @@
+[
+    {
+        "title": "Payment TLS handshake failure",
+        "incidentId": "ICM-2025-1001",
+        "serviceId": "A56C6700-6666-4444-AAAA-000F3B9CC999",
+        "serviceName": "Azure App Service (Payments)",
+        "createdDate": "2025-11-04",
+        "severity": "High",
+        "changeRelated": true,
+        "rootCause": "TLS certificate expired",
+        "rootCauseSubcategory": "Security",
+        "subscriptionsImpacted": [
+            "subs-prod-001"
+        ]
+    },
+    {
+        "title": "Retail API cold start loop",
+        "incidentId": "ICM-2025-1002",
+        "serviceId": "B77D8800-7777-5555-BBBB-001F4C9DD888",
+        "serviceName": "Azure API Management (Retail)",
+        "createdDate": "2025-10-22",
+        "severity": "Medium",
+        "changeRelated": false,
+        "rootCause": "Dependency loop on startup",
+        "rootCauseSubcategory": "Application",
+        "subscriptionsImpacted": [
+            "subs-prod-002"
+        ]
+    },
+    {
+        "title": "Gamma analytics job crash",
+        "incidentId": "ICM-2025-1003",
+        "serviceId": "C88E9900-8888-6666-CCCC-002F5D9EE777",
+        "serviceName": "Azure Databricks (Insights)",
+        "createdDate": "2025-09-30",
+        "severity": "High",
+        "changeRelated": true,
+        "rootCause": "Databricks driver crash",
+        "rootCauseSubcategory": "Platform",
+        "subscriptionsImpacted": [
+            "subs-prod-003",
+            "subs-dev-002"
+        ]
+    },
+    {
+        "title": "Delta control plane ripple",
+        "incidentId": "ICM-2025-1004",
+        "serviceId": "D99FA000-9999-7777-DDDD-003F6E9FF666",
+        "serviceName": "Azure Kubernetes Service (Core)",
+        "createdDate": "2025-11-18",
+        "severity": "Medium",
+        "changeRelated": true,
+        "rootCause": "AKS upgrade disrupted API server",
+        "rootCauseSubcategory": "Platform",
+        "subscriptionsImpacted": [
+            "subs-prod-001"
+        ]
+    },
+    {
+        "title": "Omega event backlog",
+        "incidentId": "ICM-2025-1005",
+        "serviceId": "F12A1100-1111-8888-EEEE-004F7FA0AA55",
+        "serviceName": "Azure Event Hubs (Messaging)",
+        "createdDate": "2025-11-20",
+        "severity": "High",
+        "changeRelated": false,
+        "rootCause": "EventHub partition drift",
+        "rootCauseSubcategory": "Network",
+        "subscriptionsImpacted": [
+            "subs-prod-002",
+            "subs-prod-005"
+        ]
+    },
+    {
+        "title": "Lambda certificate rotation",
+        "incidentId": "ICM-2025-1006",
+        "serviceId": "0ABC2200-2222-9999-FFFF-005F8FA1BB44",
+        "serviceName": "Azure AD Domain Services (Identity)",
+        "createdDate": "2025-12-01",
+        "severity": "High",
+        "changeRelated": true,
+        "rootCause": "Certificate rotation misconfig",
+        "rootCauseSubcategory": "Security",
+        "subscriptionsImpacted": [
+            "subs-prod-004"
+        ]
+    },
+    {
+        "title": "Phi database failover early",
+        "incidentId": "ICM-2025-1007",
+        "serviceId": "1BCD3300-3333-AAAB-EEEE-006F9FB2CC33",
+        "serviceName": "Azure SQL Managed Instance (Health)",
+        "createdDate": "2025-10-15",
+        "severity": "High",
+        "changeRelated": false,
+        "rootCause": "Failover ran before sync",
+        "rootCauseSubcategory": "Availability",
+        "subscriptionsImpacted": [
+            "subs-prod-003"
+        ]
+    },
+    {
+        "title": "Kappa policy block",
+        "incidentId": "ICM-2025-1008",
+        "serviceId": "2CDE4400-4444-BBBB-FFFF-007FABF3DD22",
+        "serviceName": "Azure Event Grid (Advertising)",
+        "createdDate": "2025-11-27",
+        "severity": "Medium",
+        "changeRelated": true,
+        "rootCause": "Policy blocked subscription",
+        "rootCauseSubcategory": "Governance",
+        "subscriptionsImpacted": [
+            "subs-prod-005"
+        ]
+    },
+    {
+        "title": "Zeta Cosmos slowdown",
+        "incidentId": "ICM-2025-1009",
+        "serviceId": "3DEF5500-5555-CCCC-AAAA-008FBCF4EE11",
+        "serviceName": "Azure Cosmos DB (Commerce)",
+        "createdDate": "2025-11-05",
+        "severity": "Medium",
+        "changeRelated": false,
+        "rootCause": "Index transformation slowed writes",
+        "rootCauseSubcategory": "Storage",
+        "subscriptionsImpacted": [
+            "subs-prod-002"
+        ]
+    },
+    {
+        "title": "Theta storage throttling",
+        "incidentId": "ICM-2025-1010",
+        "serviceId": "4EFA6600-6666-DDDD-BBBB-009FCD045F00",
+        "serviceName": "Azure Storage Account (Observability Logs)",
+        "createdDate": "2025-12-03",
+        "severity": "Low",
+        "changeRelated": false,
+        "rootCause": "Partition key hot spot",
+        "rootCauseSubcategory": "Storage",
+        "subscriptionsImpacted": [
+            "subs-prod-004"
+        ]
+    },
+    {
+        "title": "Sigma slot rollback",
+        "incidentId": "ICM-2025-1011",
+        "serviceId": "5F0A7700-7777-EEEE-CCCC-00AFDE156FEE",
+        "serviceName": "Azure Static Web Apps (Collaboration)",
+        "createdDate": "2025-09-18",
+        "severity": "Medium",
+        "changeRelated": true,
+        "rootCause": "Pipeline rollback left stale slot",
+        "rootCauseSubcategory": "Deployment",
+        "subscriptionsImpacted": [
+            "subs-dev-001"
+        ]
+    },
+    {
+        "title": "Tau binding mismatch",
+        "incidentId": "ICM-2025-1012",
+        "serviceId": "6A1B8800-8888-FFFF-DDDD-00BFED267FDD",
+        "serviceName": "Azure Functions (Observability Metrics)",
+        "createdDate": "2025-12-07",
+        "severity": "High",
+        "changeRelated": true,
+        "rootCause": "Bindings incompatible with extension",
+        "rootCauseSubcategory": "Application",
+        "subscriptionsImpacted": [
+            "subs-prod-005",
+            "subs-dev-002"
+        ]
+    }
+]

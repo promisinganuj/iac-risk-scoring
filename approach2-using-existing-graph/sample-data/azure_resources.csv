@@ -1,4 +1,4 @@
-resourceId,displayName,resourceType,resourceGroup,subscriptionId,location,tags
+resourceName,displayName,resourceType,resourceGroup,subscriptionId,location,tags
 res-alpha-app,Alpha Payments Web App,Microsoft.Web/sites,rg-alpha-core,subs-prod-001,eastus2,"env:prod;owner:payments;serviceId:A56C6700-6666-4444-AAAA-000F3B9CC999"
 res-beta-api,Beta Retail API,Microsoft.Web/sites,rg-beta-api,subs-prod-002,centralus,"env:prod;owner:retail;serviceId:B77D8800-7777-5555-BBBB-001F4C9DD888"
 res-gamma-lake,Gamma Insights Data Lake,Microsoft.Storage/storageAccounts,rg-gamma-analytics,subs-prod-003,eastus2,"env:prod;owner:data;serviceId:C88E9900-8888-6666-CCCC-002F5D9EE777"

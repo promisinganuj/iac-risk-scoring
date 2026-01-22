@@ -43,11 +43,28 @@ set +a
 
 ## 2) Start Neo4j + ingest sample data
 
-The helper script starts Neo4j and runs the import Cypher against the mounted CSVs:
+The helper script starts Neo4j and runs the import against the mounted data files:
 
 ```bash
+# Import JSON files (default)
 ./scripts/neo4j_up_and_import.sh
+
+# Or explicitly specify format
+./scripts/neo4j_up_and_import.sh json
+
+# Import CSV files (backward compatibility)
+./scripts/neo4j_up_and_import.sh csv
 ```
+
+**Data Format**: The sample data is available in both JSON and CSV formats in `sample-data/`:
+- **JSON** (default): Modern format with support for nested structures, used by default
+- **CSV** (legacy): Backward compatibility format, flat structure
+
+The import script uses:
+- `apoc.load.json` for JSON files (requires APOC plugin)
+- `LOAD CSV` for CSV files (built-in Neo4j)
+
+See [`sample-data/README.md`](sample-data/README.md) for detailed format documentation.
 
 **Idempotency**: Re-running the import is safe. The script uses Neo4j constraints with `MERGE` operations, so:
 - Nodes with the same unique identifiers won't be duplicated

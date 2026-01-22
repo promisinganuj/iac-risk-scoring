@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Starts Neo4j via docker compose and imports CSVs using scripts/neo4j_import.cypher.
+# Starts Neo4j via docker compose and imports data using Cypher scripts.
 # Usage:
 #   cp .env.template .env
 #   set -a && source .env && set +a
-#   ./scripts/neo4j_up_and_import.sh
+#   ./scripts/neo4j_up_and_import.sh [json|csv]
+#
+# Arguments:
+#   format: Data format to import (json or csv). Default: json
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+
+# Parse arguments
+DATA_FORMAT="${1:-json}"
+if [[ "$DATA_FORMAT" != "json" && "$DATA_FORMAT" != "csv" ]]; then
+  echo "Error: Invalid format '$DATA_FORMAT'. Must be 'json' or 'csv'." >&2
+  echo "Usage: $0 [json|csv]" >&2
+  exit 1
+fi
 
 if [[ -f "$ROOT_DIR/.env" ]]; then
   set -a
@@ -48,8 +59,16 @@ for i in {1..60}; do
   fi
 done
 
-echo "Running import script..."
-docker exec -i neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" -f /import/neo4j_import.cypher
+# Select import script based on format
+if [[ "$DATA_FORMAT" == "json" ]]; then
+  IMPORT_SCRIPT="/import/neo4j_import_json.cypher"
+  echo "Running JSON import script..."
+else
+  IMPORT_SCRIPT="/import/neo4j_import.cypher"
+  echo "Running CSV import script..."
+fi
+
+docker exec -i neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" -f "$IMPORT_SCRIPT"
 
 echo "Done. Open Neo4j Browser at http://localhost:$NEO4J_HTTP_PORT"
 echo "Browser connection (Bolt): neo4j://localhost:$NEO4J_BOLT_PORT"

@@ -17,6 +17,7 @@ services:
       - "./plugins:/plugins:ro"
       - "./sample-data:/import/data:ro"
       - "./scripts/neo4j_import.cypher:/import/neo4j_import.cypher:ro"
+      - "./scripts/neo4j_import_json.cypher:/import/neo4j_import_json.cypher:ro"
 
 volumes:
   neo4j_data:

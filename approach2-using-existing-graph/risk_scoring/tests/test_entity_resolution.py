@@ -1,5 +1,7 @@
+import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -27,6 +29,76 @@ class TestEntityResolutionCsv(unittest.TestCase):
         )
         self.assertEqual(ref.resource_id, "res-alpha-app")
         self.assertEqual(ref.label, "AzureResource")
+
+    def test_loads_from_json_by_default(self) -> None:
+        """Verify CsvEntityRepository loads from JSON files by default."""
+        repo = CsvEntityRepository(
+            sample_data_dir=Path(__file__).resolve().parents[2] / "sample-data"
+        )
+        # JSON file should exist and be loaded
+        json_path = Path(__file__).resolve().parents[2] / "sample-data" / "azure_resources.json"
+        self.assertTrue(json_path.exists(), "JSON file should exist")
+        
+        # Verify data was loaded (should have 12 resources from JSON)
+        results = repo.find_azure_resources_by_resource_id("res-alpha-app", limit=10)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].resource_id, "res-alpha-app")
+
+    def test_falls_back_to_csv_if_json_not_found(self) -> None:
+        """Verify CsvEntityRepository falls back to CSV when JSON doesn't exist."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            
+            # Create only CSV file, no JSON
+            csv_file = tmp_path / "azure_resources.csv"
+            csv_file.write_text(
+                "resourceName,displayName,resourceType,subscriptionId,resourceGroup\n"
+                "res-test-1,Test Resource 1,Microsoft.Web/sites,subs-test-001,rg-test\n"
+                "res-test-2,Test Resource 2,Microsoft.Compute/virtualMachines,subs-test-002,rg-test\n"
+            )
+            
+            repo = CsvEntityRepository(sample_data_dir=tmp_path)
+            results = repo.find_azure_resources_by_resource_id("res-test-1", limit=10)
+            
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0].resource_id, "res-test-1")
+            self.assertEqual(results[0].display_name, "Test Resource 1")
+
+    def test_raises_if_neither_json_nor_csv_exists(self) -> None:
+        """Verify CsvEntityRepository raises error if neither format exists."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            
+            with self.assertRaises(FileNotFoundError) as ctx:
+                CsvEntityRepository(sample_data_dir=tmp_path)
+            
+            self.assertIn("tried", str(ctx.exception))
+
+    def test_json_uses_resourcename_property(self) -> None:
+        """Verify JSON loading correctly reads resourceName property."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            
+            # Create JSON file with resourceName property
+            json_file = tmp_path / "azure_resources.json"
+            json_data = [
+                {
+                    "resourceName": "res-json-test",
+                    "displayName": "JSON Test Resource",
+                    "resourceType": "Microsoft.Storage/storageAccounts",
+                    "subscriptionId": "subs-json-001",
+                    "resourceGroup": "rg-json"
+                }
+            ]
+            json_file.write_text(json.dumps(json_data, indent=2))
+            
+            repo = CsvEntityRepository(sample_data_dir=tmp_path)
+            results = repo.find_azure_resources_by_resource_id("res-json-test", limit=10)
+            
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0].resource_id, "res-json-test")
+            self.assertEqual(results[0].display_name, "JSON Test Resource")
+            self.assertEqual(results[0].resource_type, "Microsoft.Storage/storageAccounts")
 
 
 class TestEntityResolutionBehavior(unittest.TestCase):

@@ -26,7 +26,7 @@ class FakeExecutor(CypherExecutor):
         if "MATCH (r:AzureResource" in cypher and "OWNS_RESOURCE" in cypher:
             return [
                 {
-                    "resourceId": params["resourceId"],
+                    "resourceName": params["resourceName"],
                     "resourceType": "Microsoft.Web/sites",
                     "serviceId": "SVC-1",
                     "serviceName": "Service One",

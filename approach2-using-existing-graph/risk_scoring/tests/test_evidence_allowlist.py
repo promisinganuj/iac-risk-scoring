@@ -33,7 +33,7 @@ class TestEvidenceAllowlist(unittest.TestCase):
         q = get_query("t1.resolve_azure_resource")
         too_long = "x" * 1000
         with self.assertRaises(ParameterValidationError):
-            validate_params(q, {"resourceId": too_long, "limit": 1})
+            validate_params(q, {"resourceName": too_long, "limit": 1})
 
     def test_queries_are_bounded_and_ordered(self) -> None:
         # Guardrail: every query must include LIMIT and ORDER BY to keep results stable.

@@ -94,10 +94,10 @@ def expand_evidence_for_resource(
         return lims.get(query_id, 20)
 
     # Resource context (service ownership, subscription, RG)
-    ctx_params = {"resourceId": resolved.resource_id, "limit": limit_for("t2.resource_context")}
+    ctx_params = {"resourceName": resolved.resource_id, "limit": limit_for("t2.resource_context")}
     ctx_rows = _stable_sort_rows(
         _coerce_rows(client.run("t2.resource_context", ctx_params)),
-        keys=("resourceId",),
+        keys=("resourceName",),
         reverse=False,
     )
     queries.append(

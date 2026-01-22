@@ -107,31 +107,31 @@ ALLOWLIST: Dict[str, QuerySpec] = {
     "t1.resolve_azure_resource": QuerySpec(
         query_id="t1.resolve_azure_resource",
         cypher=(
-            "MATCH (r:AzureResource {resourceId: $resourceId})\n"
-            "RETURN r.resourceId AS resourceId, r.displayName AS displayName, r.resourceType AS resourceType, "
+            "MATCH (r:AzureResource {resourceName: $resourceName})\n"
+            "RETURN r.resourceName AS resourceName, r.displayName AS displayName, r.resourceType AS resourceType, "
             "       r.location AS location\n"
-            "ORDER BY r.resourceId\n"
+            "ORDER BY r.resourceName\n"
             "LIMIT $limit"
         ),
-        params=(ParamSpec("resourceId", "str", required=True, max_len=256),),
+        params=(ParamSpec("resourceName", "str", required=True, max_len=256),),
         max_limit=5,
         default_limit=1,
     ),
     "t2.resource_context": QuerySpec(
         query_id="t2.resource_context",
         cypher=(
-            "MATCH (r:AzureResource {resourceId: $resourceId})\n"
+            "MATCH (r:AzureResource {resourceName: $resourceName})\n"
             "OPTIONAL MATCH (r)<-[:OWNS_RESOURCE]-(s:Service)\n"
             "OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(g:ResourceGroup)\n"
             "OPTIONAL MATCH (r)-[:IN_SUBSCRIPTION]->(sub:Subscription)\n"
-            "RETURN r.resourceId AS resourceId, r.resourceType AS resourceType, "
+            "RETURN r.resourceName AS resourceName, r.resourceType AS resourceType, "
             "       s.serviceId AS serviceId, s.name AS serviceName, "
             "       g.key AS resourceGroupKey, g.name AS resourceGroupName, "
             "       sub.subscriptionId AS subscriptionId\n"
-            "ORDER BY r.resourceId\n"
+            "ORDER BY r.resourceName\n"
             "LIMIT $limit"
         ),
-        params=(ParamSpec("resourceId", "str", required=True, max_len=256),),
+        params=(ParamSpec("resourceName", "str", required=True, max_len=256),),
         max_limit=25,
         default_limit=5,
     ),

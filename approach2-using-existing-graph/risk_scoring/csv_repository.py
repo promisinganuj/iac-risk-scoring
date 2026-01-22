@@ -55,7 +55,7 @@ def _load_resources(path: Path) -> list[CandidateEntity]:
     with path.open("r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            rid = (row.get("resourceId") or "").strip()
+            rid = (row.get("resourceName") or "").strip()
             if not rid:
                 continue
             resources.append(

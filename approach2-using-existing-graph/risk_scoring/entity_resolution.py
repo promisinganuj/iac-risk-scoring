@@ -65,7 +65,7 @@ def resolve_azure_resource(
             )
 
     if not candidates:
-        raise NotFoundError(f"AzureResource not found for resourceId={rid!r}")
+        raise NotFoundError(f"AzureResource not found for resourceName={rid!r}")
 
     if len(candidates) == 1:
         return _to_ref(candidates[0])
@@ -84,7 +84,7 @@ def resolve_azure_resource(
 
     if non_interactive:
         raise AmbiguousMatchError(
-            f"Ambiguous resourceId={rid!r}; {len(ordered)} candidates",
+            f"Ambiguous resourceName={rid!r}; {len(ordered)} candidates",
             candidates=[asdict(c) for c in ordered],
         )
 

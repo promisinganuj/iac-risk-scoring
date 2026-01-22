@@ -39,7 +39,7 @@ class TestGraphExpansion(unittest.TestCase):
         responses = {
             "t2.resource_context": [
                 {
-                    "resourceId": "res-x",
+                    "resourceName": "res-x",
                     "resourceType": "Microsoft.Web/sites",
                     "serviceId": "SVC-1",
                     "serviceName": "Service One",
@@ -95,7 +95,7 @@ class TestGraphExpansion(unittest.TestCase):
         responses = {
             "t2.resource_context": [
                 {
-                    "resourceId": "res-x",
+                    "resourceName": "res-x",
                     "resourceType": "t",
                     "serviceId": "SVC-1",
                     "serviceName": "Service One",

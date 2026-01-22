@@ -70,7 +70,7 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": (
                             "Azure resource identifier (e.g., 'res-alpha-app', 'vm-prod-web-01'). "
-                            "This is the resourceId field from the Neo4j AzureResource nodes."
+                            "This is the resourceName field from the Neo4j AzureResource nodes."
                         ),
                     },
                     "environment": {

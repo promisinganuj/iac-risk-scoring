@@ -38,7 +38,7 @@ class TestReporting(unittest.TestCase):
             {
                 "t2.resource_context": [
                     {
-                        "resourceId": "res-x",
+                        "resourceName": "res-x",
                         "resourceType": "t",
                         "serviceId": "SVC-1",
                         "serviceName": "Service One",
@@ -76,7 +76,7 @@ class TestReporting(unittest.TestCase):
             {
                 "t2.resource_context": [
                     {
-                        "resourceId": "res-x",
+                        "resourceName": "res-x",
                         "resourceType": "t",
                         "serviceId": "SVC-1",
                         "serviceName": "Service One",

@@ -17,24 +17,24 @@ class Neo4jHttpEntityRepository(EntityRepository):
         self, resource_id: str, *, limit: int
     ) -> list[CandidateEntity]:
         cypher = (
-            "MATCH (r:AzureResource {resourceId: $resourceId})\n"
+            "MATCH (r:AzureResource {resourceName: $resourceName})\n"
             "OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(g:ResourceGroup)\n"
             "OPTIONAL MATCH (r)-[:IN_SUBSCRIPTION]->(sub:Subscription)\n"
-            "RETURN r.resourceId AS resourceId, r.displayName AS displayName, r.resourceType AS resourceType, "
+            "RETURN r.resourceName AS resourceName, r.displayName AS displayName, r.resourceType AS resourceType, "
             "       sub.subscriptionId AS subscriptionId, g.name AS resourceGroup\n"
-            "ORDER BY r.resourceId\n"
+            "ORDER BY r.resourceName\n"
             "LIMIT $limit"
         )
 
         rows = run_cypher_readonly(
             config=self._config,
             cypher=cypher,
-            params={"resourceId": resource_id, "limit": int(limit)},
+            params={"resourceName": resource_id, "limit": int(limit)},
         )
 
         out: list[CandidateEntity] = []
         for row in rows:
-            rid = row.get("resourceId")
+            rid = row.get("resourceName")
             if not isinstance(rid, str) or not rid.strip():
                 continue
             out.append(
@@ -91,9 +91,9 @@ class Neo4jHttpEntityRepository(EntityRepository):
             cypher += "WHERE " + " AND ".join(where_clauses) + "\n"
 
         cypher += (
-            "RETURN r.resourceId AS resourceId, r.displayName AS displayName, r.resourceType AS resourceType, "
+            "RETURN r.resourceName AS resourceName, r.displayName AS displayName, r.resourceType AS resourceType, "
             "       sub.subscriptionId AS subscriptionId, g.name AS resourceGroup\n"
-            "ORDER BY r.resourceId\n"
+            "ORDER BY r.resourceName\n"
             "LIMIT $limit"
         )
 
@@ -101,7 +101,7 @@ class Neo4jHttpEntityRepository(EntityRepository):
 
         out: list[CandidateEntity] = []
         for row in rows:
-            rid = row.get("resourceId")
+            rid = row.get("resourceName")
             if not isinstance(rid, str) or not rid.strip():
                 continue
             out.append(

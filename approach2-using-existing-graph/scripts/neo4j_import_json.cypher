@@ -83,7 +83,9 @@ MERGE (res:AzureResource {resourceName: trim(row.resourceName)})
 SET res.displayName = row.displayName,
     res.resourceType = row.resourceType,
     res.location = row.location,
-    res.tags = row.tags
+    res.tag_owner = row.tags.owner,
+    res.tag_env = row.tags.env,
+    res.tag_serviceId = row.tags.serviceId
 
 WITH row, serviceId, res
 MERGE (sub:Subscription {subscriptionId: trim(row.subscriptionId)})
@@ -175,7 +177,8 @@ WITH row
 WHERE row.templateName IS NOT NULL AND trim(row.templateName) <> ''
 MERGE (t:Template {templateName: trim(row.templateName), templateVersion: trim(coalesce(row.templateVersion,''))})
 SET t.resourceType = row.resourceType,
-    t.properties = row.properties,
+    t.prop_sku = row.properties.sku,
+    t.prop_runtime = row.properties.runtime,
     t.resourceGroup = row.resourceGroup;
 
 CALL apoc.load.json('file:///data/template.json') YIELD value AS row

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "mcps": {
+    "beads": {
+      "type": "stdio",
+      "command": "/home/anuj/github/iac-risk-scoring/.venv/bin/beads-mcp",
+      "args": [],
+      "env": {
+        "BEADS_WORKING_DIR": "/home/anuj/github/iac-risk-scoring"
+      }
+    },
+    "neo4j-database": {
+      "command": "/home/anuj/.local/bin/uvx",
+      "args": ["--native-tls", "mcp-neo4j-cypher@0.5.2", "--transport", "stdio"],
+      "envFile": "/home/anuj/github/iac-risk-scoring/approach2-using-existing-graph/.env"
+    },
+    "risk-scoring": {
+      "command": "/home/anuj/github/iac-risk-scoring/.venv/bin/python3",
+      "args": ["-m", "risk_scoring.mcp_server"],
+      "cwd": "/home/anuj/github/iac-risk-scoring/approach2-using-existing-graph",
+      "envFile": "/home/anuj/github/iac-risk-scoring/approach2-using-existing-graph/.env"
+    }
+  }
+}

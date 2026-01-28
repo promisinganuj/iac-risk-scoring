@@ -13,6 +13,19 @@
         }
     },
     {
+        "resourceName": "res-alpha-lb",
+        "displayName": "Alpha Payments Load Balancer",
+        "resourceType": "Microsoft.Network/loadBalancers",
+        "resourceGroup": "rg-alpha-core",
+        "subscriptionId": "subs-prod-001",
+        "location": "eastus2",
+        "tags": {
+            "env": "prod",
+            "owner": "payments",
+            "serviceId": "A56C6700-6666-4444-AAAA-000F3B9CC999"
+        }
+    },
+    {
         "resourceName": "res-beta-api",
         "displayName": "Beta Retail API",
         "resourceType": "Microsoft.Web/sites",
@@ -34,6 +47,32 @@
         "location": "eastus2",
         "tags": {
             "env": "prod",
+            "owner": "data",
+            "serviceId": "C88E9900-8888-6666-CCCC-002F5D9EE777"
+        }
+    },
+    {
+        "resourceName": "res-gamma-cluster",
+        "displayName": "Gamma Insights Databricks Cluster",
+        "resourceType": "Microsoft.Databricks/workspaces",
+        "resourceGroup": "rg-gamma-analytics",
+        "subscriptionId": "subs-prod-003",
+        "location": "eastus2",
+        "tags": {
+            "env": "prod",
+            "owner": "data",
+            "serviceId": "C88E9900-8888-6666-CCCC-002F5D9EE777"
+        }
+    },
+    {
+        "resourceName": "res-gamma-dev-cluster",
+        "displayName": "Gamma Insights Dev Databricks Cluster",
+        "resourceType": "Microsoft.Databricks/workspaces",
+        "resourceGroup": "rg-gamma-analytics",
+        "subscriptionId": "subs-dev-001",
+        "location": "eastus2",
+        "tags": {
+            "env": "dev",
             "owner": "data",
             "serviceId": "C88E9900-8888-6666-CCCC-002F5D9EE777"
         }
@@ -65,6 +104,32 @@
         }
     },
     {
+        "resourceName": "res-omega-eventhub-dr",
+        "displayName": "Omega Messaging Event Hub DR",
+        "resourceType": "Microsoft.EventHub/namespaces",
+        "resourceGroup": "rg-omega-messaging",
+        "subscriptionId": "subs-prod-002",
+        "location": "westus2",
+        "tags": {
+            "env": "prod",
+            "owner": "messaging",
+            "serviceId": "F12A1100-1111-8888-EEEE-004F7FA0AA55"
+        }
+    },
+    {
+        "resourceName": "res-lambda-aad",
+        "displayName": "Lambda AAD Domain Service",
+        "resourceType": "Microsoft.AAD/domainServices",
+        "resourceGroup": "rg-lambda-id",
+        "subscriptionId": "subs-prod-004",
+        "location": "westus2",
+        "tags": {
+            "env": "prod",
+            "owner": "identity",
+            "serviceId": "0ABC2200-2222-9999-FFFF-005F8FA1BB44"
+        }
+    },
+    {
         "resourceName": "res-lambda-ad",
         "displayName": "Lambda Identity Directory",
         "resourceType": "Microsoft.AAD/domainServices",
@@ -75,6 +140,19 @@
             "env": "prod",
             "owner": "identity",
             "serviceId": "0ABC2200-2222-9999-FFFF-005F8FA1BB44"
+        }
+    },
+    {
+        "resourceName": "res-phi-sql",
+        "displayName": "Phi Health SQL Server",
+        "resourceType": "Microsoft.Sql/servers",
+        "resourceGroup": "rg-phi-health",
+        "subscriptionId": "subs-prod-003",
+        "location": "centralus",
+        "tags": {
+            "env": "prod",
+            "owner": "health",
+            "serviceId": "1BCD3300-3333-AAAB-EEEE-006F9FB2CC33"
         }
     },
     {
@@ -104,8 +182,34 @@
         }
     },
     {
+        "resourceName": "res-kappa-eventgrid",
+        "displayName": "Kappa Ads Event Grid Subscription",
+        "resourceType": "Microsoft.EventGrid/eventSubscriptions",
+        "resourceGroup": "rg-kappa-ads",
+        "subscriptionId": "subs-prod-005",
+        "location": "eastus2",
+        "tags": {
+            "env": "prod",
+            "owner": "ads",
+            "serviceId": "2CDE4400-4444-BBBB-FFFF-007FABF3DD22"
+        }
+    },
+    {
         "resourceName": "res-zeta-commerce",
         "displayName": "Zeta Commerce Cosmos",
+        "resourceType": "Microsoft.DocumentDB/databaseAccounts",
+        "resourceGroup": "rg-zeta-commerce",
+        "subscriptionId": "subs-prod-002",
+        "location": "centralus",
+        "tags": {
+            "env": "prod",
+            "owner": "commerce",
+            "serviceId": "3DEF5500-5555-CCCC-AAAA-008FBCF4EE11"
+        }
+    },
+    {
+        "resourceName": "res-zeta-cosmos",
+        "displayName": "Zeta Commerce Cosmos DB",
         "resourceType": "Microsoft.DocumentDB/databaseAccounts",
         "resourceGroup": "rg-zeta-commerce",
         "subscriptionId": "subs-prod-002",
@@ -130,6 +234,19 @@
         }
     },
     {
+        "resourceName": "res-theta-storage",
+        "displayName": "Theta Analytics Storage",
+        "resourceType": "Microsoft.Storage/storageAccounts",
+        "resourceGroup": "rg-theta-observability",
+        "subscriptionId": "subs-prod-004",
+        "location": "eastus",
+        "tags": {
+            "env": "prod",
+            "owner": "observability",
+            "serviceId": "4EFA6600-6666-DDDD-BBBB-009FCD045F00"
+        }
+    },
+    {
         "resourceName": "res-sigma-collab",
         "displayName": "Sigma Collaboration App Service",
         "resourceType": "Microsoft.Web/sites",
@@ -140,6 +257,45 @@
             "env": "dev",
             "owner": "collab",
             "serviceId": "5F0A7700-7777-EEEE-CCCC-00AFDE156FEE"
+        }
+    },
+    {
+        "resourceName": "res-sigma-webapp",
+        "displayName": "Sigma Collaboration Web App",
+        "resourceType": "Microsoft.Web/sites",
+        "resourceGroup": "rg-sigma-collab",
+        "subscriptionId": "subs-dev-001",
+        "location": "westus",
+        "tags": {
+            "env": "dev",
+            "owner": "collab",
+            "serviceId": "5F0A7700-7777-EEEE-CCCC-00AFDE156FEE"
+        }
+    },
+    {
+        "resourceName": "res-tau-function",
+        "displayName": "Tau Observability Function App",
+        "resourceType": "Microsoft.Web/sites",
+        "resourceGroup": "rg-tau-observability",
+        "subscriptionId": "subs-prod-005",
+        "location": "eastus2",
+        "tags": {
+            "env": "prod",
+            "owner": "observability",
+            "serviceId": "6A1B8800-8888-FFFF-DDDD-00BFED267FDD"
+        }
+    },
+    {
+        "resourceName": "res-tau-function-dev",
+        "displayName": "Tau Observability Function Dev",
+        "resourceType": "Microsoft.Web/sites",
+        "resourceGroup": "rg-tau-observability",
+        "subscriptionId": "subs-dev-001",
+        "location": "eastus2",
+        "tags": {
+            "env": "dev",
+            "owner": "observability",
+            "serviceId": "6A1B8800-8888-FFFF-DDDD-00BFED267FDD"
         }
     },
     {

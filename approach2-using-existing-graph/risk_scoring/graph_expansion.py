@@ -231,3 +231,229 @@ def expand_evidence_for_resource(
         queries=tuple(queries),
         unknowns=tuple(sorted(set(unknowns))),
     )
+
+
+@dataclass(frozen=True)
+class BlastRadiusResult:
+    """Blast radius analysis showing how changes propagate through the hierarchy."""
+
+    entity_id: str
+    entity_type: str  # 'resource', 'template', or 'service'
+    affected_services: int
+    affected_resources: int
+    affected_resource_groups: int
+    affected_subscriptions: int
+    incident_count: int
+    deployment_count: int
+    details: Dict[str, Any]
+    queries: Tuple[QueryRun, ...]
+
+
+def get_resource_blast_radius(
+    resource_id: str,
+    client: EvidenceClient,
+    *,
+    limit: int = 1,
+) -> BlastRadiusResult:
+    """Calculate blast radius for a resource change.
+
+    Traversal path: Resource -> ResourceGroup -> Subscription -> Services -> Incidents
+
+    Args:
+        resource_id: The resourceName to analyze
+        client: EvidenceClient for executing queries
+        limit: Result limit (default 1, since we're analyzing a single resource)
+
+    Returns:
+        BlastRadiusResult with impact counts and detailed entity information
+    """
+    queries: List[QueryRun] = []
+
+    params = {"resourceName": resource_id, "limit": limit}
+    rows = _coerce_rows(client.run("blast_radius.resource_impact", params))
+
+    queries.append(
+        QueryRun(
+            query_id="blast_radius.resource_impact",
+            params=dict(params),
+            row_count=len(rows),
+            sample_rows=tuple(rows),
+        )
+    )
+
+    if not rows:
+        return BlastRadiusResult(
+            entity_id=resource_id,
+            entity_type="resource",
+            affected_services=0,
+            affected_resources=0,
+            affected_resource_groups=0,
+            affected_subscriptions=0,
+            incident_count=0,
+            deployment_count=0,
+            details={},
+            queries=tuple(queries),
+        )
+
+    row = rows[0]
+
+    return BlastRadiusResult(
+        entity_id=resource_id,
+        entity_type="resource",
+        affected_services=1 if row.get("serviceId") else 0,
+        affected_resources=row.get("peerResourceCount", 0),
+        affected_resource_groups=1 if row.get("resourceGroupKey") else 0,
+        affected_subscriptions=1 if row.get("subscriptionId") else 0,
+        incident_count=row.get("incidentCount", 0),
+        deployment_count=0,  # Not directly tracked at resource level
+        details={
+            "resourceType": row.get("resourceType"),
+            "resourceGroup": {
+                "key": row.get("resourceGroupKey"),
+                "name": row.get("resourceGroupName"),
+            } if row.get("resourceGroupKey") else None,
+            "subscription": row.get("subscriptionId"),
+            "service": {
+                "id": row.get("serviceId"),
+                "name": row.get("serviceName"),
+            } if row.get("serviceId") else None,
+            "peerResources": row.get("peerResources", []),
+            "recentIncidents": row.get("recentIncidents", []),
+        },
+        queries=tuple(queries),
+    )
+
+
+def get_template_blast_radius(
+    template_name: str,
+    client: EvidenceClient,
+    *,
+    limit: int = 1,
+) -> BlastRadiusResult:
+    """Calculate blast radius for a template change.
+
+    Traversal path: Template -> Deployments -> ResourceGroups -> Resources
+
+    Args:
+        template_name: The template name to analyze
+        client: EvidenceClient for executing queries
+        limit: Result limit (default 1, since we're analyzing a single template)
+
+    Returns:
+        BlastRadiusResult with impact counts and detailed entity information
+    """
+    queries: List[QueryRun] = []
+
+    params = {"templateName": template_name, "limit": limit}
+    rows = _coerce_rows(client.run("blast_radius.template_impact", params))
+
+    queries.append(
+        QueryRun(
+            query_id="blast_radius.template_impact",
+            params=dict(params),
+            row_count=len(rows),
+            sample_rows=tuple(rows),
+        )
+    )
+
+    if not rows:
+        return BlastRadiusResult(
+            entity_id=template_name,
+            entity_type="template",
+            affected_services=0,
+            affected_resources=0,
+            affected_resource_groups=0,
+            affected_subscriptions=0,
+            incident_count=0,
+            deployment_count=0,
+            details={},
+            queries=tuple(queries),
+        )
+
+    row = rows[0]
+
+    return BlastRadiusResult(
+        entity_id=template_name,
+        entity_type="template",
+        affected_services=0,  # Services are indirectly affected via deployments
+        affected_resources=row.get("resourceCount", 0),
+        affected_resource_groups=row.get("resourceGroupCount", 0),
+        affected_subscriptions=0,  # Not tracked at template level in this query
+        incident_count=0,  # Would need to traverse to services for this
+        deployment_count=row.get("deploymentCount", 0),
+        details={
+            "templateVersion": row.get("templateVersion"),
+            "deployments": row.get("deployments", []),
+            "resourceGroups": row.get("resourceGroups", []),
+            "resources": row.get("resources", []),
+        },
+        queries=tuple(queries),
+    )
+
+
+def get_service_blast_radius(
+    service_id: str,
+    client: EvidenceClient,
+    *,
+    limit: int = 1,
+) -> BlastRadiusResult:
+    """Calculate blast radius for a service change.
+
+    Traversal path: Service -> Resources -> ResourceGroups/Subscriptions -> Incidents
+
+    Args:
+        service_id: The serviceId to analyze
+        client: EvidenceClient for executing queries
+        limit: Result limit (default 1, since we're analyzing a single service)
+
+    Returns:
+        BlastRadiusResult with impact counts and detailed entity information
+    """
+    queries: List[QueryRun] = []
+
+    params = {"serviceId": service_id, "limit": limit}
+    rows = _coerce_rows(client.run("blast_radius.service_impact", params))
+
+    queries.append(
+        QueryRun(
+            query_id="blast_radius.service_impact",
+            params=dict(params),
+            row_count=len(rows),
+            sample_rows=tuple(rows),
+        )
+    )
+
+    if not rows:
+        return BlastRadiusResult(
+            entity_id=service_id,
+            entity_type="service",
+            affected_services=0,
+            affected_resources=0,
+            affected_resource_groups=0,
+            affected_subscriptions=0,
+            incident_count=0,
+            deployment_count=0,
+            details={},
+            queries=tuple(queries),
+        )
+
+    row = rows[0]
+
+    return BlastRadiusResult(
+        entity_id=service_id,
+        entity_type="service",
+        affected_services=1,  # The service itself
+        affected_resources=row.get("resourceCount", 0),
+        affected_resource_groups=row.get("resourceGroupCount", 0),
+        affected_subscriptions=row.get("subscriptionCount", 0),
+        incident_count=row.get("incidentCount", 0),
+        deployment_count=row.get("deploymentCount", 0),
+        details={
+            "serviceName": row.get("serviceName"),
+            "resources": row.get("resources", []),
+            "resourceGroups": row.get("resourceGroups", []),
+            "subscriptions": row.get("subscriptions", []),
+            "incidents": row.get("incidents", []),
+        },
+        queries=tuple(queries),
+    )

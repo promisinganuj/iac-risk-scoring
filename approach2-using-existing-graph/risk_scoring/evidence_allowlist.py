@@ -224,6 +224,80 @@ ALLOWLIST: Dict[str, QuerySpec] = {
         max_limit=50,
         default_limit=20,
     ),
+    # Blast radius queries
+    "blast_radius.resource_impact": QuerySpec(
+        query_id="blast_radius.resource_impact",
+        cypher=(
+            "MATCH (r:AzureResource {resourceName: $resourceName})\n"
+            "OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(rg:ResourceGroup)\n"
+            "OPTIONAL MATCH (rg)-[:IN_SUBSCRIPTION]->(sub:Subscription)\n"
+            "OPTIONAL MATCH (r)<-[:OWNS_RESOURCE]-(s:Service)\n"
+            "OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(rg)<-[:IN_RESOURCE_GROUP]-(peer:AzureResource)\n"
+            "WHERE peer.resourceName <> r.resourceName\n"
+            "OPTIONAL MATCH (s)<-[:AFFECTS_SERVICE]-(i:Incident)\n"
+            "WITH r, rg, sub, s, collect(DISTINCT peer) AS peers, collect(DISTINCT i) AS incidents\n"
+            "RETURN r.resourceName AS resourceName, r.resourceType AS resourceType, "
+            "       rg.key AS resourceGroupKey, rg.name AS resourceGroupName, "
+            "       sub.subscriptionId AS subscriptionId, "
+            "       s.serviceId AS serviceId, s.name AS serviceName, "
+            "       size(peers) AS peerResourceCount, "
+            "       [p IN peers | {name: p.resourceName, type: p.resourceType}] AS peerResources, "
+            "       size(incidents) AS incidentCount, "
+            "       [inc IN incidents | {id: inc.incidentId, severity: inc.severity, date: inc.createdDate}] AS recentIncidents\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("resourceName", "str", required=True, max_len=256),),
+        max_limit=10,
+        default_limit=1,
+    ),
+    "blast_radius.template_impact": QuerySpec(
+        query_id="blast_radius.template_impact",
+        cypher=(
+            "MATCH (t:Template {name: $templateName})\n"
+            "OPTIONAL MATCH (d:Deployment)-[:USES_TEMPLATE]->(t)\n"
+            "OPTIONAL MATCH (d)-[:TARGETS_RESOURCE_GROUP]->(rg:ResourceGroup)\n"
+            "OPTIONAL MATCH (rg)<-[:IN_RESOURCE_GROUP]-(r:AzureResource)\n"
+            "WITH t, collect(DISTINCT d) AS deployments, collect(DISTINCT rg) AS resourceGroups, collect(DISTINCT r) AS resources\n"
+            "RETURN t.name AS templateName, t.version AS templateVersion, "
+            "       size(deployments) AS deploymentCount, "
+            "       [dep IN deployments | {rolloutId: dep.rolloutId, artifactVersion: dep.artifactVersion}] AS deployments, "
+            "       size(resourceGroups) AS resourceGroupCount, "
+            "       [g IN resourceGroups | {key: g.key, name: g.name}] AS resourceGroups, "
+            "       size(resources) AS resourceCount, "
+            "       [res IN resources | {name: res.resourceName, type: res.resourceType}] AS resources\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("templateName", "str", required=True, max_len=256),),
+        max_limit=10,
+        default_limit=1,
+    ),
+    "blast_radius.service_impact": QuerySpec(
+        query_id="blast_radius.service_impact",
+        cypher=(
+            "MATCH (s:Service {serviceId: $serviceId})\n"
+            "OPTIONAL MATCH (s)-[:OWNS_RESOURCE]->(r:AzureResource)\n"
+            "OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(rg:ResourceGroup)\n"
+            "OPTIONAL MATCH (r)-[:IN_SUBSCRIPTION]->(sub:Subscription)\n"
+            "OPTIONAL MATCH (s)<-[:AFFECTS_SERVICE]-(i:Incident)\n"
+            "OPTIONAL MATCH (d:Deployment)-[:FOR_SERVICE]->(s)\n"
+            "WITH s, collect(DISTINCT r) AS resources, collect(DISTINCT rg) AS resourceGroups, "
+            "     collect(DISTINCT sub) AS subscriptions, collect(DISTINCT i) AS incidents, collect(DISTINCT d) AS deployments\n"
+            "RETURN s.serviceId AS serviceId, s.name AS serviceName, "
+            "       size(resources) AS resourceCount, "
+            "       [res IN resources | {name: res.resourceName, type: res.resourceType}] AS resources, "
+            "       size(resourceGroups) AS resourceGroupCount, "
+            "       [g IN resourceGroups | {key: g.key, name: g.name}] AS resourceGroups, "
+            "       size(subscriptions) AS subscriptionCount, "
+            "       [sub IN subscriptions | sub.subscriptionId] AS subscriptions, "
+            "       size(incidents) AS incidentCount, "
+            "       [inc IN incidents | {id: inc.incidentId, severity: inc.severity, date: inc.createdDate, changeRelated: inc.changeRelated}] AS incidents, "
+            "       size(deployments) AS deploymentCount\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("serviceId", "str", required=True, max_len=128),),
+        max_limit=10,
+        default_limit=1,
+    ),
 }
 
 

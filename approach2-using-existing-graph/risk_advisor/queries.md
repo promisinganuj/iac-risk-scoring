@@ -815,3 +815,330 @@ RETURN s.serviceId,
 
 These hierarchical queries enable the risk advisor to provide much richer context than flat data models, leading to better risk assessments and operational insights.
 
+---
+
+## Blast Radius Queries
+
+Blast radius queries calculate how changes propagate through the hierarchy, helping assess the potential impact of infrastructure modifications. These queries are used by the risk scoring engine to quantify change risk.
+
+### Q26) "Calculate resource-level blast radius"
+
+**Purpose**: Determine the impact of changing a specific Azure resource
+
+**Input:**
+- `resourceName=res-alpha-app`
+
+**Traversal path**: Resource → ResourceGroup → Subscription → Service → Incidents
+
+**Evidence query:**
+```cypher
+MATCH (r:AzureResource {resourceName: $resourceName})
+OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(rg:ResourceGroup)
+OPTIONAL MATCH (rg)-[:IN_SUBSCRIPTION]->(sub:Subscription)
+OPTIONAL MATCH (r)<-[:OWNS_RESOURCE]-(s:Service)
+OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(rg)<-[:IN_RESOURCE_GROUP]-(peer:AzureResource)
+WHERE peer.resourceName <> r.resourceName
+OPTIONAL MATCH (s)<-[:AFFECTS_SERVICE]-(i:Incident)
+WITH r, rg, sub, s, collect(DISTINCT peer) AS peers, collect(DISTINCT i) AS incidents
+RETURN r.resourceName AS resourceName, r.resourceType AS resourceType,
+       rg.key AS resourceGroupKey, rg.name AS resourceGroupName,
+       sub.subscriptionId AS subscriptionId,
+       s.serviceId AS serviceId, s.name AS serviceName,
+       size(peers) AS peerResourceCount,
+       [p IN peers | {name: p.resourceName, type: p.resourceType}] AS peerResources,
+       size(incidents) AS incidentCount,
+       [inc IN incidents | {id: inc.incidentId, severity: inc.severity, date: inc.createdDate}] AS recentIncidents
+LIMIT 1
+```
+
+**Expected output:**
+```json
+{
+  "resourceName": "res-alpha-app",
+  "resourceType": "Microsoft.Web/sites",
+  "resourceGroupKey": "rg-alpha-core",
+  "resourceGroupName": "Alpha Core Infrastructure",
+  "subscriptionId": "subs-prod-001",
+  "serviceId": "A56C6700-6666-4444-AAAA-000F3B9CC999",
+  "serviceName": "Payments",
+  "peerResourceCount": 2,
+  "peerResources": [
+    {"name": "res-alpha-lb", "type": "Microsoft.Network/loadBalancers"},
+    {"name": "res-alpha-db", "type": "Microsoft.Sql/servers/databases"}
+  ],
+  "incidentCount": 3,
+  "recentIncidents": [
+    {"id": "ICM-2025-1001", "severity": "2", "date": "2025-01-15"},
+    {"id": "ICM-2025-1002", "severity": "3", "date": "2025-01-20"},
+    {"id": "ICM-2024-0789", "severity": "2", "date": "2024-12-10"}
+  ]
+}
+```
+
+**Blast radius metrics:**
+- **Affected services**: 1 (the owning service)
+- **Affected resources**: 2 (peer resources in same RG)
+- **Affected resource groups**: 1
+- **Affected subscriptions**: 1
+- **Historical incidents**: 3 (service incident history)
+
+**Good answer includes:**
+- Resource type and location
+- Owning service (accountability)
+- Peer resources that share the same RG (potential blast radius)
+- Service incident history (operational risk indicator)
+- Subscription and RG context (change scope)
+
+**Usage in risk assessment:**
+- Changes to resources with many peers have higher blast radius
+- Services with recent incidents indicate higher operational risk
+- Resource type influences change complexity (e.g., databases vs load balancers)
+- Peer resource types help assess coupling (e.g., app + db + lb = full stack)
+
+**Risk factors:**
+- `peerResourceCount > 5`: High coupling, medium risk
+- `incidentCount > 3 (last 180d)`: Unstable service, high risk
+- `resourceType contains 'Sql|Cosmos|Storage'`: Stateful resource, high risk
+- `subscriptionId contains 'prod'`: Production environment, high risk
+
+---
+
+### Q27) "Calculate template-level blast radius"
+
+**Purpose**: Determine the impact of changing an ARM/Bicep template
+
+**Input:**
+- `templateName=template-alpha-app`
+
+**Traversal path**: Template → Deployments → ResourceGroups → Resources
+
+**Evidence query:**
+```cypher
+MATCH (t:Template {name: $templateName})
+OPTIONAL MATCH (d:Deployment)-[:USES_TEMPLATE]->(t)
+OPTIONAL MATCH (d)-[:TARGETS_RESOURCE_GROUP]->(rg:ResourceGroup)
+OPTIONAL MATCH (rg)<-[:IN_RESOURCE_GROUP]-(r:AzureResource)
+WITH t, collect(DISTINCT d) AS deployments, collect(DISTINCT rg) AS resourceGroups, collect(DISTINCT r) AS resources
+RETURN t.name AS templateName, t.version AS templateVersion,
+       size(deployments) AS deploymentCount,
+       [dep IN deployments | {rolloutId: dep.rolloutId, artifactVersion: dep.artifactVersion}] AS deployments,
+       size(resourceGroups) AS resourceGroupCount,
+       [g IN resourceGroups | {key: g.key, name: g.name}] AS resourceGroups,
+       size(resources) AS resourceCount,
+       [res IN resources | {name: res.resourceName, type: res.resourceType}] AS resources
+LIMIT 1
+```
+
+**Expected output:**
+```json
+{
+  "templateName": "template-alpha-app",
+  "templateVersion": "2.1.0",
+  "deploymentCount": 3,
+  "deployments": [
+    {"rolloutId": "deploy-alpha-001", "artifactVersion": "v1.2.0"},
+    {"rolloutId": "deploy-alpha-002", "artifactVersion": "v1.2.1"},
+    {"rolloutId": "deploy-alpha-003", "artifactVersion": "v1.3.0"}
+  ],
+  "resourceGroupCount": 2,
+  "resourceGroups": [
+    {"key": "rg-alpha-core", "name": "Alpha Core Infrastructure"},
+    {"key": "rg-alpha-dr", "name": "Alpha DR Environment"}
+  ],
+  "resourceCount": 5,
+  "resources": [
+    {"name": "res-alpha-app", "type": "Microsoft.Web/sites"},
+    {"name": "res-alpha-lb", "type": "Microsoft.Network/loadBalancers"},
+    {"name": "res-alpha-db", "type": "Microsoft.Sql/servers/databases"},
+    {"name": "res-alpha-dr-app", "type": "Microsoft.Web/sites"},
+    {"name": "res-alpha-dr-db", "type": "Microsoft.Sql/servers/databases"}
+  ]
+}
+```
+
+**Blast radius metrics:**
+- **Affected services**: Indirect (services owning affected resources)
+- **Affected resources**: 5 (managed by this template)
+- **Affected resource groups**: 2
+- **Affected subscriptions**: Indirect (via RGs)
+- **Deployment history**: 3 (recent usage)
+
+**Good answer includes:**
+- Template version (breaking changes between versions)
+- Active deployments using this template
+- Resource groups managed by deployments
+- Resources created by template deployments
+- Deployment frequency (change velocity indicator)
+
+**Usage in risk assessment:**
+- Templates with many deployments have wide blast radius
+- Multiple resource groups indicate cross-environment impact
+- High resource count suggests complex infrastructure
+- Template changes affect all future deployments
+
+**Risk factors:**
+- `deploymentCount > 10`: Widely used template, high risk
+- `resourceGroupCount > 3`: Multi-environment impact, high risk
+- `resourceCount > 20`: Complex infrastructure, high risk
+- `resources contains 'Sql|Cosmos|KeyVault'`: Stateful/security resources, critical
+
+---
+
+### Q28) "Calculate service-level blast radius"
+
+**Purpose**: Determine the impact of changing a service (code, config, or ownership)
+
+**Input:**
+- `serviceId=A56C6700-6666-4444-AAAA-000F3B9CC999`
+
+**Traversal path**: Service → Resources → ResourceGroups/Subscriptions → Incidents
+
+**Evidence query:**
+```cypher
+MATCH (s:Service {serviceId: $serviceId})
+OPTIONAL MATCH (s)-[:OWNS_RESOURCE]->(r:AzureResource)
+OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(rg:ResourceGroup)
+OPTIONAL MATCH (r)-[:IN_SUBSCRIPTION]->(sub:Subscription)
+OPTIONAL MATCH (s)<-[:AFFECTS_SERVICE]-(i:Incident)
+OPTIONAL MATCH (d:Deployment)-[:FOR_SERVICE]->(s)
+WITH s, collect(DISTINCT r) AS resources, collect(DISTINCT rg) AS resourceGroups,
+     collect(DISTINCT sub) AS subscriptions, collect(DISTINCT i) AS incidents, collect(DISTINCT d) AS deployments
+RETURN s.serviceId AS serviceId, s.name AS serviceName,
+       size(resources) AS resourceCount,
+       [res IN resources | {name: res.resourceName, type: res.resourceType}] AS resources,
+       size(resourceGroups) AS resourceGroupCount,
+       [g IN resourceGroups | {key: g.key, name: g.name}] AS resourceGroups,
+       size(subscriptions) AS subscriptionCount,
+       [sub IN subscriptions | sub.subscriptionId] AS subscriptions,
+       size(incidents) AS incidentCount,
+       [inc IN incidents | {id: inc.incidentId, severity: inc.severity, date: inc.createdDate, changeRelated: inc.changeRelated}] AS incidents,
+       size(deployments) AS deploymentCount
+LIMIT 1
+```
+
+**Expected output:**
+```json
+{
+  "serviceId": "A56C6700-6666-4444-AAAA-000F3B9CC999",
+  "serviceName": "Payments",
+  "resourceCount": 3,
+  "resources": [
+    {"name": "res-alpha-app", "type": "Microsoft.Web/sites"},
+    {"name": "res-alpha-lb", "type": "Microsoft.Network/loadBalancers"},
+    {"name": "res-alpha-db", "type": "Microsoft.Sql/servers/databases"}
+  ],
+  "resourceGroupCount": 2,
+  "resourceGroups": [
+    {"key": "rg-alpha-core", "name": "Alpha Core Infrastructure"},
+    {"key": "rg-alpha-dr", "name": "Alpha DR Environment"}
+  ],
+  "subscriptionCount": 1,
+  "subscriptions": ["subs-prod-001"],
+  "incidentCount": 3,
+  "incidents": [
+    {"id": "ICM-2025-1001", "severity": "2", "date": "2025-01-15", "changeRelated": "Yes"},
+    {"id": "ICM-2025-1002", "severity": "3", "date": "2025-01-20", "changeRelated": "No"},
+    {"id": "ICM-2024-0789", "severity": "2", "date": "2024-12-10", "changeRelated": "Yes"}
+  ],
+  "deploymentCount": 12
+}
+```
+
+**Blast radius metrics:**
+- **Affected services**: 1 (the service itself)
+- **Affected resources**: 3 (owned by service)
+- **Affected resource groups**: 2 (service spans RGs)
+- **Affected subscriptions**: 1
+- **Historical incidents**: 3
+- **Deployment velocity**: 12 deployments
+
+**Good answer includes:**
+- Service name and ID
+- Resource footprint (owned resources)
+- Resource group spread (single vs multi-RG)
+- Subscription usage (single vs multi-subscription)
+- Incident history with severity and change-relatedness
+- Deployment frequency (change velocity)
+
+**Usage in risk assessment:**
+- Services with many resources have larger blast radius
+- Multi-RG services indicate complex topology
+- Change-related incidents suggest deployment risk
+- High deployment count indicates active development (higher change risk)
+
+**Risk factors:**
+- `resourceCount > 10`: Large infrastructure footprint, high risk
+- `resourceGroupCount > 2`: Multi-environment or complex topology, medium risk
+- `subscriptionCount > 1`: Cross-subscription service, high coordination needed
+- `incidentCount > 5 (last 180d)`: Operational instability, high risk
+- `changeRelated == 'Yes'`: Previous change-induced incidents, high risk
+- `deploymentCount > 20 (last 90d)`: High change velocity, elevated risk
+
+---
+
+### Blast Radius Query Integration
+
+These blast radius queries are integrated into the risk scoring engine via the `graph_expansion.py` module:
+
+**Python API:**
+```python
+from risk_scoring.graph_expansion import (
+    get_resource_blast_radius,
+    get_template_blast_radius,
+    get_service_blast_radius,
+    BlastRadiusResult
+)
+from risk_scoring.evidence_client import EvidenceClient
+
+# Get resource blast radius
+result: BlastRadiusResult = get_resource_blast_radius(
+    resource_id="res-alpha-app",
+    client=evidence_client,
+    limit=1
+)
+
+print(f"Entity: {result.entity_id} ({result.entity_type})")
+print(f"Affected services: {result.affected_services}")
+print(f"Affected resources: {result.affected_resources}")
+print(f"Affected resource groups: {result.affected_resource_groups}")
+print(f"Incident count: {result.incident_count}")
+print(f"Details: {result.details}")
+```
+
+**CLI Usage:**
+```bash
+# Resource blast radius
+python -m risk_scoring blast-radius resource res-alpha-app
+
+# Template blast radius
+python -m risk_scoring blast-radius template template-alpha-app
+
+# Service blast radius
+python -m risk_scoring blast-radius service A56C6700-6666-4444-AAAA-000F3B9CC999
+```
+
+**Risk Score Integration:**
+The blast radius metrics feed directly into the risk scoring algorithm:
+
+| Metric | Weight | Reasoning |
+|--------|--------|-----------|
+| `affected_services` | 20% | Service count indicates cross-team coordination needs |
+| `affected_resources` | 15% | Resource count indicates change complexity |
+| `affected_resource_groups` | 10% | RG count indicates deployment scope |
+| `affected_subscriptions` | 10% | Subscription count indicates security boundary crossings |
+| `incident_count` | 25% | Historical incidents indicate operational risk |
+| `deployment_count` | 10% | Change velocity indicates stability |
+| `peer_resource_coupling` | 10% | Peer resources indicate potential cascade failures |
+
+**Determinism guarantees:**
+- All queries use `ORDER BY` for stable ordering
+- Results are bounded with `LIMIT`
+- Queries are allowlisted and parameterized
+- Output is deduplicated and sorted
+
+**Performance considerations:**
+- Queries limited to 2-hop traversals (prevents runaway queries)
+- Use `OPTIONAL MATCH` for missing relationships (handles incomplete data)
+- Aggregate before collecting (reduces memory usage)
+- Sample nested results with `[..5]` (limits output size)
+

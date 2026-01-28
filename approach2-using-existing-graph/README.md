@@ -71,6 +71,13 @@ See [`sample-data/README.md`](sample-data/README.md) for detailed format documen
 - Properties may be updated on re-run
 - Relationships are recreated safely without duplication
 
+**Temporal Features**: The graph includes temporal dimensions for enhanced risk assessment:
+- Timeline events with sequential ordering for incident response analysis
+- Deployment stages with start/end times for performance tracking
+- Change frequency metadata for services and resources
+
+See [`docs/TEMPORAL_FEATURES.md`](docs/TEMPORAL_FEATURES.md) for details on how temporal data enhances risk scoring.
+
 ## 3) Schema validation using Neo4j Browser
 
 Open:
@@ -727,6 +734,27 @@ Cypher script containing all import logic:
 - Relationship creation between nodes
 
 This is the source of truth for the graph schema and data model.
+
+### `scripts/add_change_frequency.cypher`
+
+Computes change frequency metadata for services, resource groups, and resources based on deployment history.
+
+```bash
+docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" \
+  -f /import/add_change_frequency.cypher
+```
+
+What it does:
+- Calculates `deploymentCount` for Services and ResourceGroups
+- Calculates `changeFrequency` for AzureResources
+- Sets `lastUpdated` timestamp on all nodes
+
+**When to run**:
+- After initial import
+- After importing new deployment data
+- Periodically (daily or weekly) to keep metrics current
+
+See [`docs/TEMPORAL_FEATURES.md`](docs/TEMPORAL_FEATURES.md) for how change frequency enhances risk scoring.
 
 ## 10) Natural-language risk questions (playbook)
 

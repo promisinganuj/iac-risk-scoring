@@ -20,6 +20,7 @@ services:
       - "./scripts/neo4j_import.cypher:/import/neo4j_import.cypher:ro"
       - "./scripts/neo4j_import_json.cypher:/import/neo4j_import_json.cypher:ro"
       - "./scripts/validate_graph.cypher:/import/validate_graph.cypher:ro"
+      - "./scripts/add_change_frequency.cypher:/import/add_change_frequency.cypher:ro"
 
 volumes:
   neo4j_data:

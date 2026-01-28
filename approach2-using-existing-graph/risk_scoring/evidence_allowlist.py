@@ -162,6 +162,68 @@ ALLOWLIST: Dict[str, QuerySpec] = {
         max_limit=50,
         default_limit=20,
     ),
+    "t5.resource_blast_radius": QuerySpec(
+        query_id="t5.resource_blast_radius",
+        cypher=(
+            "MATCH (r:AzureResource {resourceName: $resourceName})\n"
+            "OPTIONAL MATCH (r)-[:IN_RESOURCE_GROUP]->(rg:ResourceGroup)<-[:IN_RESOURCE_GROUP]-(peer:AzureResource)\n"
+            "WHERE peer.resourceName <> r.resourceName\n"
+            "OPTIONAL MATCH (r)<-[:OWNS_RESOURCE]-(s:Service)<-[:AFFECTS_SERVICE]-(i:Incident)\n"
+            "WITH r, collect(DISTINCT peer.resourceName) AS peerResources, count(DISTINCT i) AS incidentCount\n"
+            "RETURN r.resourceName AS resourceName, peerResources, incidentCount\n"
+            "ORDER BY r.resourceName\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("resourceName", "str", required=True, max_len=256),),
+        max_limit=25,
+        default_limit=5,
+    ),
+    "t6.deployment_stage_failures": QuerySpec(
+        query_id="t6.deployment_stage_failures",
+        cypher=(
+            "MATCH (d:Deployment)-[:FOR_SERVICE]->(s:Service {serviceId: $serviceId})\n"
+            "MATCH (d)-[:HAS_STAGE]->(st:DeploymentStage)\n"
+            "WHERE st.status = 'failed'\n"
+            "RETURN d.rolloutId AS rolloutId, st.name AS stageName, st.status AS status, "
+            "       st.order AS stageOrder, st.startTime AS startTime, st.endTime AS endTime\n"
+            "ORDER BY d.rolloutId DESC, st.order ASC\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("serviceId", "str", required=True, max_len=128),),
+        max_limit=50,
+        default_limit=20,
+    ),
+    "t7.artifact_dependencies": QuerySpec(
+        query_id="t7.artifact_dependencies",
+        cypher=(
+            "MATCH (s:Service {serviceId: $serviceId})-[:HAS_REPO]->(r:Repo)-[:PRODUCES_ARTIFACT]->(a:Artifact)\n"
+            "OPTIONAL MATCH (a)-[:DEPENDS_ON*1..3]->(dep:Artifact)\n"
+            "WITH a, collect(DISTINCT dep.name) AS dependencies\n"
+            "RETURN a.name AS artifactName, a.type AS artifactType, dependencies\n"
+            "ORDER BY a.name\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("serviceId", "str", required=True, max_len=128),),
+        max_limit=50,
+        default_limit=20,
+    ),
+    "t8.incident_mttm": QuerySpec(
+        query_id="t8.incident_mttm",
+        cypher=(
+            "MATCH (i:Incident)-[:AFFECTS_SERVICE]->(s:Service {serviceId: $serviceId})\n"
+            "OPTIONAL MATCH (i)-[:HAS_TIMELINE_EVENT]->(detected:TimelineEvent {event: 'detected'})\n"
+            "OPTIONAL MATCH (i)-[:HAS_TIMELINE_EVENT]->(mitigated:TimelineEvent {event: 'mitigated'})\n"
+            "WITH i, detected.timestamp AS detectedTime, mitigated.timestamp AS mitigatedTime\n"
+            "WHERE detectedTime IS NOT NULL AND mitigatedTime IS NOT NULL\n"
+            "RETURN i.incidentId AS incidentId, i.createdDate AS createdDate, "
+            "       detectedTime, mitigatedTime\n"
+            "ORDER BY i.createdDate DESC\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("serviceId", "str", required=True, max_len=128),),
+        max_limit=50,
+        default_limit=20,
+    ),
 }
 
 

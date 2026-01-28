@@ -42,6 +42,10 @@ class TestEvidenceAllowlist(unittest.TestCase):
             "t2.resource_context",
             "t3.service_incidents",
             "t4.service_deployments",
+            "t5.resource_blast_radius",
+            "t6.deployment_stage_failures",
+            "t7.artifact_dependencies",
+            "t8.incident_mttm",
         ]:
             q = get_query(qid)
             cypher_upper = q.cypher.upper()

@@ -47,6 +47,7 @@ class TestScoringDeterminism(unittest.TestCase):
                 "artifact.deep_deps",
                 "resource.peer_impact",
                 "incident.recurrence",
+                "template.complexity",
             ],
         )
 
@@ -133,6 +134,81 @@ class TestScoringDeterminism(unittest.TestCase):
         recurrence_factor = [f for f in result.factors if f.factor_id == "incident.recurrence"][0]
         self.assertEqual(recurrence_factor.status, "hit")
         self.assertEqual(recurrence_factor.points, 4)
+
+    def test_template_complexity_high(self) -> None:
+        """Test template complexity factor with high complexity (max 10 pts)."""
+        change = ChangeContext.create(environment="prod")
+        evidence = {
+            "services_impacted": 1,
+            "critical_services": [],
+            "historical_outages_180d": 0,
+            "open_icms": 0,
+            "deployment_count_30d": 0,
+            "template_required_dependency_count": 5,  # > 3 = 5 pts
+            "template_max_dependency_depth": 3,  # > 2 = 5 pts
+        }
+
+        result = score_change(change, evidence)
+        template_factor = [f for f in result.factors if f.factor_id == "template.complexity"][0]
+        self.assertEqual(template_factor.status, "hit")
+        self.assertEqual(template_factor.points, 10)
+        self.assertEqual(template_factor.max_points, 10)
+
+    def test_template_complexity_partial(self) -> None:
+        """Test template complexity factor with partial complexity (5 pts)."""
+        change = ChangeContext.create(environment="prod")
+        evidence = {
+            "services_impacted": 1,
+            "critical_services": [],
+            "historical_outages_180d": 0,
+            "open_icms": 0,
+            "deployment_count_30d": 0,
+            "template_required_dependency_count": 2,  # <= 3 = 0 pts
+            "template_max_dependency_depth": 3,  # > 2 = 5 pts
+        }
+
+        result = score_change(change, evidence)
+        template_factor = [f for f in result.factors if f.factor_id == "template.complexity"][0]
+        self.assertEqual(template_factor.status, "hit")
+        self.assertEqual(template_factor.points, 5)
+
+    def test_template_complexity_low(self) -> None:
+        """Test template complexity factor with low complexity (0 pts)."""
+        change = ChangeContext.create(environment="prod")
+        evidence = {
+            "services_impacted": 1,
+            "critical_services": [],
+            "historical_outages_180d": 0,
+            "open_icms": 0,
+            "deployment_count_30d": 0,
+            "template_required_dependency_count": 1,  # <= 3 = 0 pts
+            "template_max_dependency_depth": 2,  # <= 2 = 0 pts
+        }
+
+        result = score_change(change, evidence)
+        template_factor = [f for f in result.factors if f.factor_id == "template.complexity"][0]
+        self.assertEqual(template_factor.status, "miss")
+        self.assertEqual(template_factor.points, 0)
+
+    def test_template_complexity_missing(self) -> None:
+        """Test template complexity factor with missing evidence."""
+        change = ChangeContext.create(environment="prod")
+        evidence = {
+            "services_impacted": 1,
+            "critical_services": [],
+            "historical_outages_180d": 0,
+            "open_icms": 0,
+            "deployment_count_30d": 0,
+            # template data omitted
+        }
+
+        result = score_change(change, evidence)
+        self.assertIn("template_required_dependency_count", result.unknowns)
+        self.assertIn("template_max_dependency_depth", result.unknowns)
+
+        template_factor = [f for f in result.factors if f.factor_id == "template.complexity"][0]
+        self.assertEqual(template_factor.status, "unknown")
+        self.assertEqual(template_factor.points, 0)
 
 
 if __name__ == "__main__":

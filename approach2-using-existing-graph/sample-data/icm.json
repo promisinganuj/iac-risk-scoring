@@ -5,7 +5,51 @@
         "ownerAlias": "liaison1",
         "serviceId": "A56C6700-6666-4444-AAAA-000F3B9CC999",
         "infrastructureInvolved": "AKS-eastus2",
-        "causeDescription": "Failed outbound TLS handshake causing payment decline"
+        "causeDescription": "Failed outbound TLS handshake causing payment decline",
+        "relatedIncidents": [
+            {
+                "incidentId": "ICM-2024-9985",
+                "relationship": "similar-issue",
+                "description": "Previous TLS certificate expiry"
+            }
+        ],
+        "affectedResources": [
+            {
+                "resourceId": "res-alpha-app",
+                "impactType": "unavailable",
+                "duration": "45 minutes"
+            },
+            {
+                "resourceId": "res-alpha-lb",
+                "impactType": "degraded",
+                "duration": "30 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify expired certificate",
+                "timestamp": "2025-11-04T10:20:00Z",
+                "assignee": "liaison1"
+            },
+            {
+                "step": 2,
+                "action": "Request manual certificate renewal",
+                "timestamp": "2025-11-04T10:25:00Z",
+                "assignee": "liaison1"
+            },
+            {
+                "step": 3,
+                "action": "Deploy renewed certificate",
+                "timestamp": "2025-11-04T10:45:00Z",
+                "assignee": "security-team"
+            }
+        ],
+        "escalationPath": {
+            "level1": "payments-ops",
+            "level2": "platform-sre",
+            "level3": "security-team"
+        }
     },
     {
         "incidentId": "ICM-2025-1002",
@@ -13,7 +57,34 @@
         "ownerAlias": "liaison2",
         "serviceId": "B77D8800-7777-5555-BBBB-001F4C9DD888",
         "infrastructureInvolved": "AppService-centralus",
-        "causeDescription": "Circular dependency triggered cold start delay"
+        "causeDescription": "Circular dependency triggered cold start delay",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-beta-api",
+                "impactType": "slow-start",
+                "duration": "20 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify dependency loop",
+                "timestamp": "2025-10-22T14:35:00Z",
+                "assignee": "liaison2"
+            },
+            {
+                "step": 2,
+                "action": "Restart app service",
+                "timestamp": "2025-10-22T14:45:00Z",
+                "assignee": "liaison2"
+            }
+        ],
+        "escalationPath": {
+            "level1": "retailops",
+            "level2": "platform-sre",
+            "level3": null
+        }
     },
     {
         "incidentId": "ICM-2025-1003",
@@ -21,7 +92,51 @@
         "ownerAlias": "liaison3",
         "serviceId": "C88E9900-8888-6666-CCCC-002F5D9EE777",
         "infrastructureInvolved": "Databricks-cluster",
-        "causeDescription": "Job driver container crashed after dependency update"
+        "causeDescription": "Job driver container crashed after dependency update",
+        "relatedIncidents": [
+            {
+                "incidentId": "ICM-2025-0987",
+                "relationship": "caused-by",
+                "description": "Databricks runtime upgrade"
+            }
+        ],
+        "affectedResources": [
+            {
+                "resourceId": "res-gamma-cluster",
+                "impactType": "unavailable",
+                "duration": "2 hours"
+            },
+            {
+                "resourceId": "res-gamma-dev-cluster",
+                "impactType": "unavailable",
+                "duration": "30 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify incompatible runtime version",
+                "timestamp": "2025-09-30T08:15:00Z",
+                "assignee": "liaison3"
+            },
+            {
+                "step": 2,
+                "action": "Rollback runtime to previous version",
+                "timestamp": "2025-09-30T09:30:00Z",
+                "assignee": "databricks-admin"
+            },
+            {
+                "step": 3,
+                "action": "Restart failed jobs",
+                "timestamp": "2025-09-30T10:00:00Z",
+                "assignee": "liaison3"
+            }
+        ],
+        "escalationPath": {
+            "level1": "data-analytics",
+            "level2": "platform-sre",
+            "level3": "databricks-vendor"
+        }
     },
     {
         "incidentId": "ICM-2025-1004",
@@ -29,7 +144,34 @@
         "ownerAlias": "liaison4",
         "serviceId": "D99FA000-9999-7777-DDDD-003F6E9FF666",
         "infrastructureInvolved": "AKS-westus2",
-        "causeDescription": "Node pool upgrade disrupted control plane"
+        "causeDescription": "Node pool upgrade disrupted control plane",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-delta-k8s",
+                "impactType": "degraded",
+                "duration": "15 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Monitor API server health",
+                "timestamp": "2025-11-18T16:05:00Z",
+                "assignee": "liaison4"
+            },
+            {
+                "step": 2,
+                "action": "Wait for automatic recovery",
+                "timestamp": "2025-11-18T16:10:00Z",
+                "assignee": "liaison4"
+            }
+        ],
+        "escalationPath": {
+            "level1": "platform-sre",
+            "level2": "azure-support",
+            "level3": null
+        }
     },
     {
         "incidentId": "ICM-2025-1005",
@@ -37,7 +179,45 @@
         "ownerAlias": "liaison5",
         "serviceId": "F12A1100-1111-8888-EEEE-004F7FA0AA55",
         "infrastructureInvolved": "EventHub-namespace",
-        "causeDescription": "Partition rebalancing backlog choked throughput"
+        "causeDescription": "Partition rebalancing backlog choked throughput",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-omega-eventhub",
+                "impactType": "degraded",
+                "duration": "1 hour"
+            },
+            {
+                "resourceId": "res-omega-eventhub-dr",
+                "impactType": "degraded",
+                "duration": "30 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify partition imbalance",
+                "timestamp": "2025-11-20T11:10:00Z",
+                "assignee": "liaison5"
+            },
+            {
+                "step": 2,
+                "action": "Trigger manual partition rebalancing",
+                "timestamp": "2025-11-20T11:30:00Z",
+                "assignee": "liaison5"
+            },
+            {
+                "step": 3,
+                "action": "Monitor backlog clearance",
+                "timestamp": "2025-11-20T11:45:00Z",
+                "assignee": "liaison5"
+            }
+        ],
+        "escalationPath": {
+            "level1": "messaging-ops",
+            "level2": "platform-sre",
+            "level3": "azure-support"
+        }
     },
     {
         "incidentId": "ICM-2025-1006",
@@ -45,7 +225,40 @@
         "ownerAlias": "liaison6",
         "serviceId": "0ABC2200-2222-9999-FFFF-005F8FA1BB44",
         "infrastructureInvolved": "AAD-domain",
-        "causeDescription": "Certificate rotation misconfigured"
+        "causeDescription": "Certificate rotation misconfigured",
+        "relatedIncidents": [
+            {
+                "incidentId": "ICM-2025-1001",
+                "relationship": "similar-issue",
+                "description": "TLS certificate issue"
+            }
+        ],
+        "affectedResources": [
+            {
+                "resourceId": "res-lambda-aad",
+                "impactType": "unavailable",
+                "duration": "30 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify cert rotation failure",
+                "timestamp": "2025-12-01T09:05:00Z",
+                "assignee": "liaison6"
+            },
+            {
+                "step": 2,
+                "action": "Rollback certificate configuration",
+                "timestamp": "2025-12-01T09:20:00Z",
+                "assignee": "security-team"
+            }
+        ],
+        "escalationPath": {
+            "level1": "identity",
+            "level2": "security-team",
+            "level3": "azure-support"
+        }
     },
     {
         "incidentId": "ICM-2025-1007",
@@ -53,7 +266,34 @@
         "ownerAlias": "liaison7",
         "serviceId": "1BCD3300-3333-AAAB-EEEE-006F9FB2CC33",
         "infrastructureInvolved": "SQL-primary",
-        "causeDescription": "Failover script executed before data sync"
+        "causeDescription": "Failover script executed before data sync",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-phi-sql",
+                "impactType": "data-loss-risk",
+                "duration": "10 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Stop failover process",
+                "timestamp": "2025-10-15T07:32:00Z",
+                "assignee": "liaison7"
+            },
+            {
+                "step": 2,
+                "action": "Force sync from backup",
+                "timestamp": "2025-10-15T07:35:00Z",
+                "assignee": "dba-team"
+            }
+        ],
+        "escalationPath": {
+            "level1": "healthcare-platform",
+            "level2": "dba-team",
+            "level3": "azure-support"
+        }
     },
     {
         "incidentId": "ICM-2025-1008",
@@ -61,7 +301,40 @@
         "ownerAlias": "liaison8",
         "serviceId": "2CDE4400-4444-BBBB-FFFF-007FABF3DD22",
         "infrastructureInvolved": "EventGrid-eastus2",
-        "causeDescription": "Azure policy blocked event subscription creation"
+        "causeDescription": "Azure policy blocked event subscription creation",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-kappa-eventgrid",
+                "impactType": "deployment-blocked",
+                "duration": "25 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify blocking policy",
+                "timestamp": "2025-11-27T13:05:00Z",
+                "assignee": "liaison8"
+            },
+            {
+                "step": 2,
+                "action": "Request policy exemption",
+                "timestamp": "2025-11-27T13:10:00Z",
+                "assignee": "liaison8"
+            },
+            {
+                "step": 3,
+                "action": "Apply exemption and retry deployment",
+                "timestamp": "2025-11-27T13:20:00Z",
+                "assignee": "governance-team"
+            }
+        ],
+        "escalationPath": {
+            "level1": "ads-eng",
+            "level2": "governance-team",
+            "level3": null
+        }
     },
     {
         "incidentId": "ICM-2025-1009",
@@ -69,7 +342,34 @@
         "ownerAlias": "liaison9",
         "serviceId": "3DEF5500-5555-CCCC-AAAA-008FBCF4EE11",
         "infrastructureInvolved": "CosmosDB-centralus",
-        "causeDescription": "Index transformation slowed writes"
+        "causeDescription": "Index transformation slowed writes",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-zeta-cosmos",
+                "impactType": "degraded",
+                "duration": "40 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify indexing operation",
+                "timestamp": "2025-11-05T15:10:00Z",
+                "assignee": "liaison9"
+            },
+            {
+                "step": 2,
+                "action": "Pause index transformation",
+                "timestamp": "2025-11-05T15:30:00Z",
+                "assignee": "dba-team"
+            }
+        ],
+        "escalationPath": {
+            "level1": "commerce",
+            "level2": "dba-team",
+            "level3": "azure-support"
+        }
     },
     {
         "incidentId": "ICM-2025-1010",
@@ -77,7 +377,34 @@
         "ownerAlias": "liaison10",
         "serviceId": "4EFA6600-6666-DDDD-BBBB-009FCD045F00",
         "infrastructureInvolved": "Storage-eastus",
-        "causeDescription": "Partition key hot spot led to throttling"
+        "causeDescription": "Partition key hot spot led to throttling",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-theta-storage",
+                "impactType": "throttled",
+                "duration": "15 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify hot partition",
+                "timestamp": "2025-12-03T10:05:00Z",
+                "assignee": "liaison10"
+            },
+            {
+                "step": 2,
+                "action": "Adjust partition key distribution",
+                "timestamp": "2025-12-03T10:10:00Z",
+                "assignee": "liaison10"
+            }
+        ],
+        "escalationPath": {
+            "level1": "obs-analytics",
+            "level2": "platform-sre",
+            "level3": null
+        }
     },
     {
         "incidentId": "ICM-2025-1011",
@@ -85,7 +412,34 @@
         "ownerAlias": "liaison11",
         "serviceId": "5F0A7700-7777-EEEE-CCCC-00AFDE156FEE",
         "infrastructureInvolved": "AppService-westus",
-        "causeDescription": "Pipeline rollback left stale slot"
+        "causeDescription": "Pipeline rollback left stale slot",
+        "relatedIncidents": [],
+        "affectedResources": [
+            {
+                "resourceId": "res-sigma-webapp",
+                "impactType": "stale-deployment",
+                "duration": "20 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify stale deployment slot",
+                "timestamp": "2025-09-18T12:05:00Z",
+                "assignee": "liaison11"
+            },
+            {
+                "step": 2,
+                "action": "Manual slot cleanup",
+                "timestamp": "2025-09-18T12:15:00Z",
+                "assignee": "liaison11"
+            }
+        ],
+        "escalationPath": {
+            "level1": "collab-sre",
+            "level2": "platform-sre",
+            "level3": null
+        }
     },
     {
         "incidentId": "ICM-2025-1012",
@@ -93,6 +447,44 @@
         "ownerAlias": "liaison12",
         "serviceId": "6A1B8800-8888-FFFF-DDDD-00BFED267FDD",
         "infrastructureInvolved": "FunctionApp-eastus2",
-        "causeDescription": "Dependency upgrade introduced binding mismatch"
+        "causeDescription": "Dependency upgrade introduced binding mismatch",
+        "relatedIncidents": [
+            {
+                "incidentId": "ICM-2025-1003",
+                "relationship": "similar-issue",
+                "description": "Dependency upgrade causing failures"
+            }
+        ],
+        "affectedResources": [
+            {
+                "resourceId": "res-tau-function",
+                "impactType": "unavailable",
+                "duration": "35 minutes"
+            },
+            {
+                "resourceId": "res-tau-function-dev",
+                "impactType": "unavailable",
+                "duration": "10 minutes"
+            }
+        ],
+        "mitigationSteps": [
+            {
+                "step": 1,
+                "action": "Identify incompatible extension version",
+                "timestamp": "2025-12-07T14:05:00Z",
+                "assignee": "liaison12"
+            },
+            {
+                "step": 2,
+                "action": "Rollback extension to previous version",
+                "timestamp": "2025-12-07T14:25:00Z",
+                "assignee": "liaison12"
+            }
+        ],
+        "escalationPath": {
+            "level1": "obs-platform",
+            "level2": "platform-sre",
+            "level3": "azure-support"
+        }
     }
 ]

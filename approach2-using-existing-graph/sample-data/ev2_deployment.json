@@ -6,7 +6,77 @@
         "rolloutInfra": "AKS-eastus2-v4",
         "artifactVersion": "2025.3.1",
         "resourceGroup": "rg-alpha-core",
-        "subscriptionId": "subs-prod-001"
+        "subscriptionId": "subs-prod-001",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["eastus2"],
+                "percentage": 5,
+                "status": "completed",
+                "startTime": "2025-12-15T09:00:00Z",
+                "endTime": "2025-12-15T09:30:00Z",
+                "healthChecks": ["smoke-test", "integration-test"]
+            },
+            {
+                "name": "pilot",
+                "order": 2,
+                "regions": ["eastus2", "westus2"],
+                "percentage": 25,
+                "status": "completed",
+                "startTime": "2025-12-15T10:00:00Z",
+                "endTime": "2025-12-15T11:00:00Z",
+                "healthChecks": ["load-test", "performance-test"]
+            },
+            {
+                "name": "production",
+                "order": 3,
+                "regions": ["eastus2", "westus2", "centralus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-12-15T12:00:00Z",
+                "endTime": "2025-12-15T13:30:00Z",
+                "healthChecks": ["smoke-test", "monitoring-validation"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["eastus2"],
+                    "dependencies": []
+                },
+                {
+                    "wave": 2,
+                    "regions": ["westus2"],
+                    "dependencies": ["wave-1"]
+                },
+                {
+                    "wave": 3,
+                    "regions": ["centralus"],
+                    "dependencies": ["wave-2"]
+                }
+            ],
+            "rollbackStrategy": "automatic",
+            "approvalRequired": true
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 98,
+            "validationGates": [
+                {
+                    "gate": "smoke-test",
+                    "passed": true,
+                    "timestamp": "2025-12-15T09:15:00Z"
+                },
+                {
+                    "gate": "performance-test",
+                    "passed": true,
+                    "timestamp": "2025-12-15T10:45:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-102",
@@ -15,7 +85,52 @@
         "rolloutInfra": "AppService-centralus-2",
         "artifactVersion": "2025.2.8",
         "resourceGroup": "rg-beta-api",
-        "subscriptionId": "subs-prod-002"
+        "subscriptionId": "subs-prod-002",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["centralus"],
+                "percentage": 10,
+                "status": "completed",
+                "startTime": "2025-11-20T14:00:00Z",
+                "endTime": "2025-11-20T14:20:00Z",
+                "healthChecks": ["api-health"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["centralus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-11-20T15:00:00Z",
+                "endTime": "2025-11-20T15:45:00Z",
+                "healthChecks": ["api-health", "database-connectivity"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["centralus"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "manual",
+            "approvalRequired": false
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 95,
+            "validationGates": [
+                {
+                    "gate": "api-health",
+                    "passed": true,
+                    "timestamp": "2025-11-20T14:10:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-103",
@@ -24,7 +139,58 @@
         "rolloutInfra": "Databricks-eastus2",
         "artifactVersion": "2025.4.0",
         "resourceGroup": "rg-gamma-analytics",
-        "subscriptionId": "subs-prod-003"
+        "subscriptionId": "subs-prod-003",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["eastus2"],
+                "percentage": 5,
+                "status": "completed",
+                "startTime": "2025-12-01T08:00:00Z",
+                "endTime": "2025-12-01T08:30:00Z",
+                "healthChecks": ["cluster-health", "job-validation"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["eastus2"],
+                "percentage": 100,
+                "status": "failed",
+                "startTime": "2025-12-01T09:00:00Z",
+                "endTime": "2025-12-01T09:45:00Z",
+                "healthChecks": ["cluster-health"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["eastus2"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "automatic",
+            "approvalRequired": true
+        },
+        "status": {
+            "overallStatus": "failed",
+            "healthScore": 45,
+            "validationGates": [
+                {
+                    "gate": "cluster-health",
+                    "passed": false,
+                    "timestamp": "2025-12-01T09:30:00Z"
+                }
+            ],
+            "issues": [
+                {
+                    "severity": "high",
+                    "description": "Cluster nodes failed to start",
+                    "timestamp": "2025-12-01T09:15:00Z"
+                }
+            ]
+        }
     },
     {
         "rolloutId": "RL-2025-104",
@@ -33,7 +199,67 @@
         "rolloutInfra": "AKS-westus2-v3",
         "artifactVersion": "2025.1.5",
         "resourceGroup": "rg-delta-platform",
-        "subscriptionId": "subs-prod-001"
+        "subscriptionId": "subs-prod-001",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["westus2"],
+                "percentage": 5,
+                "status": "completed",
+                "startTime": "2025-11-18T15:00:00Z",
+                "endTime": "2025-11-18T15:30:00Z",
+                "healthChecks": ["k8s-api-health"]
+            },
+            {
+                "name": "pilot",
+                "order": 2,
+                "regions": ["westus2"],
+                "percentage": 30,
+                "status": "completed",
+                "startTime": "2025-11-18T16:00:00Z",
+                "endTime": "2025-11-18T16:45:00Z",
+                "healthChecks": ["k8s-api-health", "pod-health"]
+            },
+            {
+                "name": "production",
+                "order": 3,
+                "regions": ["westus2"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-11-18T17:00:00Z",
+                "endTime": "2025-11-18T18:00:00Z",
+                "healthChecks": ["k8s-api-health", "pod-health", "service-mesh"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["westus2"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "automatic",
+            "approvalRequired": true
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 92,
+            "validationGates": [
+                {
+                    "gate": "k8s-api-health",
+                    "passed": true,
+                    "timestamp": "2025-11-18T15:20:00Z"
+                },
+                {
+                    "gate": "pod-health",
+                    "passed": true,
+                    "timestamp": "2025-11-18T16:30:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-105",
@@ -42,7 +268,52 @@
         "rolloutInfra": "EventHub-eastus-standard",
         "artifactVersion": "2025.1.12",
         "resourceGroup": "rg-omega-messaging",
-        "subscriptionId": "subs-prod-002"
+        "subscriptionId": "subs-prod-002",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["eastus"],
+                "percentage": 10,
+                "status": "completed",
+                "startTime": "2025-11-25T10:00:00Z",
+                "endTime": "2025-11-25T10:30:00Z",
+                "healthChecks": ["eventhub-throughput"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["eastus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-11-25T11:00:00Z",
+                "endTime": "2025-11-25T12:00:00Z",
+                "healthChecks": ["eventhub-throughput", "consumer-groups"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["eastus"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "automatic",
+            "approvalRequired": false
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 97,
+            "validationGates": [
+                {
+                    "gate": "eventhub-throughput",
+                    "passed": true,
+                    "timestamp": "2025-11-25T10:20:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-106",
@@ -51,7 +322,62 @@
         "rolloutInfra": "AAD-automation",
         "artifactVersion": "2025.3.4",
         "resourceGroup": "rg-lambda-id",
-        "subscriptionId": "subs-prod-004"
+        "subscriptionId": "subs-prod-004",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["eastus"],
+                "percentage": 5,
+                "status": "completed",
+                "startTime": "2025-12-05T08:00:00Z",
+                "endTime": "2025-12-05T08:20:00Z",
+                "healthChecks": ["auth-latency"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["eastus", "westus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-12-05T09:00:00Z",
+                "endTime": "2025-12-05T10:00:00Z",
+                "healthChecks": ["auth-latency", "token-validation"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["eastus"],
+                    "dependencies": []
+                },
+                {
+                    "wave": 2,
+                    "regions": ["westus"],
+                    "dependencies": ["wave-1"]
+                }
+            ],
+            "rollbackStrategy": "manual",
+            "approvalRequired": true
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 99,
+            "validationGates": [
+                {
+                    "gate": "auth-latency",
+                    "passed": true,
+                    "timestamp": "2025-12-05T08:15:00Z"
+                },
+                {
+                    "gate": "token-validation",
+                    "passed": true,
+                    "timestamp": "2025-12-05T09:45:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-107",
@@ -60,7 +386,52 @@
         "rolloutInfra": "SQLFailover-centralus",
         "artifactVersion": "2025.2.1",
         "resourceGroup": "rg-phi-health",
-        "subscriptionId": "subs-prod-003"
+        "subscriptionId": "subs-prod-003",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["centralus"],
+                "percentage": 5,
+                "status": "completed",
+                "startTime": "2025-10-20T07:00:00Z",
+                "endTime": "2025-10-20T07:30:00Z",
+                "healthChecks": ["database-connectivity"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["centralus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-10-20T08:00:00Z",
+                "endTime": "2025-10-20T09:00:00Z",
+                "healthChecks": ["database-connectivity", "replication-status"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["centralus"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "manual",
+            "approvalRequired": true
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 94,
+            "validationGates": [
+                {
+                    "gate": "database-connectivity",
+                    "passed": true,
+                    "timestamp": "2025-10-20T07:20:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-108",
@@ -69,7 +440,52 @@
         "rolloutInfra": "EventGrid-eastus2",
         "artifactVersion": "2025.3.2",
         "resourceGroup": "rg-kappa-ads",
-        "subscriptionId": "subs-prod-005"
+        "subscriptionId": "subs-prod-005",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["eastus2"],
+                "percentage": 10,
+                "status": "completed",
+                "startTime": "2025-11-30T12:00:00Z",
+                "endTime": "2025-11-30T12:30:00Z",
+                "healthChecks": ["event-delivery"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["eastus2"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-11-30T13:00:00Z",
+                "endTime": "2025-11-30T14:00:00Z",
+                "healthChecks": ["event-delivery", "subscription-health"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["eastus2"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "automatic",
+            "approvalRequired": false
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 93,
+            "validationGates": [
+                {
+                    "gate": "event-delivery",
+                    "passed": true,
+                    "timestamp": "2025-11-30T12:20:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-109",
@@ -78,7 +494,57 @@
         "rolloutInfra": "CosmosDB-centralus",
         "artifactVersion": "2025.1.9",
         "resourceGroup": "rg-zeta-commerce",
-        "subscriptionId": "subs-prod-002"
+        "subscriptionId": "subs-prod-002",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["centralus"],
+                "percentage": 5,
+                "status": "completed",
+                "startTime": "2025-11-10T10:00:00Z",
+                "endTime": "2025-11-10T10:30:00Z",
+                "healthChecks": ["cosmos-rps"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["centralus", "eastus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-11-10T11:00:00Z",
+                "endTime": "2025-11-10T12:30:00Z",
+                "healthChecks": ["cosmos-rps", "replication-lag"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["centralus"],
+                    "dependencies": []
+                },
+                {
+                    "wave": 2,
+                    "regions": ["eastus"],
+                    "dependencies": ["wave-1"]
+                }
+            ],
+            "rollbackStrategy": "manual",
+            "approvalRequired": true
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 96,
+            "validationGates": [
+                {
+                    "gate": "cosmos-rps",
+                    "passed": true,
+                    "timestamp": "2025-11-10T10:25:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-110",
@@ -87,7 +553,52 @@
         "rolloutInfra": "Storage-eastus",
         "artifactVersion": "2025.2.6",
         "resourceGroup": "rg-theta-observability",
-        "subscriptionId": "subs-prod-004"
+        "subscriptionId": "subs-prod-004",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["eastus"],
+                "percentage": 10,
+                "status": "completed",
+                "startTime": "2025-12-08T09:00:00Z",
+                "endTime": "2025-12-08T09:30:00Z",
+                "healthChecks": ["storage-iops"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["eastus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-12-08T10:00:00Z",
+                "endTime": "2025-12-08T11:00:00Z",
+                "healthChecks": ["storage-iops", "access-patterns"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["eastus"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "automatic",
+            "approvalRequired": false
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 91,
+            "validationGates": [
+                {
+                    "gate": "storage-iops",
+                    "passed": true,
+                    "timestamp": "2025-12-08T09:20:00Z"
+                }
+            ],
+            "issues": []
+        }
     },
     {
         "rolloutId": "RL-2025-111",
@@ -96,7 +607,58 @@
         "rolloutInfra": "AppService-westus",
         "artifactVersion": "2025.4.1",
         "resourceGroup": "rg-sigma-collab",
-        "subscriptionId": "subs-dev-001"
+        "subscriptionId": "subs-dev-001",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["westus"],
+                "percentage": 20,
+                "status": "completed",
+                "startTime": "2025-09-20T11:00:00Z",
+                "endTime": "2025-09-20T11:30:00Z",
+                "healthChecks": ["webapp-health"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["westus"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-09-20T12:00:00Z",
+                "endTime": "2025-09-20T13:00:00Z",
+                "healthChecks": ["webapp-health", "cdn-propagation"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["westus"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "manual",
+            "approvalRequired": false
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 88,
+            "validationGates": [
+                {
+                    "gate": "webapp-health",
+                    "passed": true,
+                    "timestamp": "2025-09-20T11:20:00Z"
+                }
+            ],
+            "issues": [
+                {
+                    "severity": "low",
+                    "description": "CDN cache took longer than expected to refresh",
+                    "timestamp": "2025-09-20T12:45:00Z"
+                }
+            ]
+        }
     },
     {
         "rolloutId": "RL-2025-112",
@@ -105,6 +667,56 @@
         "rolloutInfra": "FunctionApp-eastus2",
         "artifactVersion": "2025.5.0",
         "resourceGroup": "rg-tau-observability",
-        "subscriptionId": "subs-prod-005"
+        "subscriptionId": "subs-prod-005",
+        "stages": [
+            {
+                "name": "canary",
+                "order": 1,
+                "regions": ["eastus2"],
+                "percentage": 10,
+                "status": "completed",
+                "startTime": "2025-12-10T14:00:00Z",
+                "endTime": "2025-12-10T14:30:00Z",
+                "healthChecks": ["function-executions"]
+            },
+            {
+                "name": "production",
+                "order": 2,
+                "regions": ["eastus2"],
+                "percentage": 100,
+                "status": "completed",
+                "startTime": "2025-12-10T15:00:00Z",
+                "endTime": "2025-12-10T16:00:00Z",
+                "healthChecks": ["function-executions", "binding-health"]
+            }
+        ],
+        "rolloutPlan": {
+            "waves": [
+                {
+                    "wave": 1,
+                    "regions": ["eastus2"],
+                    "dependencies": []
+                }
+            ],
+            "rollbackStrategy": "automatic",
+            "approvalRequired": true
+        },
+        "status": {
+            "overallStatus": "succeeded",
+            "healthScore": 100,
+            "validationGates": [
+                {
+                    "gate": "function-executions",
+                    "passed": true,
+                    "timestamp": "2025-12-10T14:20:00Z"
+                },
+                {
+                    "gate": "binding-health",
+                    "passed": true,
+                    "timestamp": "2025-12-10T15:45:00Z"
+                }
+            ],
+            "issues": []
+        }
     }
 ]

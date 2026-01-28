@@ -7,10 +7,41 @@
         "createdDate": "2025-11-04",
         "severity": "High",
         "changeRelated": true,
-        "rootCause": "TLS certificate expired",
-        "rootCauseSubcategory": "Security",
+        "rootCause": {
+            "category": "Security",
+            "subcategory": "Certificate Management",
+            "description": "TLS certificate expired",
+            "relatedResources": ["res-alpha-app", "res-alpha-lb"],
+            "triggeringChange": "Automated certificate renewal failed"
+        },
         "subscriptionsImpacted": [
-            "subs-prod-001"
+            {
+                "subscriptionId": "subs-prod-001",
+                "impactLevel": "high",
+                "affectedResources": ["res-alpha-app", "res-alpha-db"],
+                "userImpact": {
+                    "usersAffected": 15000,
+                    "transactionsFailed": 8500,
+                    "duration": "45 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-11-04T10:15:00Z",
+                "source": "monitoring-alert"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-11-04T10:45:00Z",
+                "action": "Manual certificate renewal"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-11-04T11:00:00Z",
+                "action": "All services restored"
+            }
         ]
     },
     {
@@ -21,10 +52,41 @@
         "createdDate": "2025-10-22",
         "severity": "Medium",
         "changeRelated": false,
-        "rootCause": "Dependency loop on startup",
-        "rootCauseSubcategory": "Application",
+        "rootCause": {
+            "category": "Application",
+            "subcategory": "Dependency",
+            "description": "Dependency loop on startup",
+            "relatedResources": ["res-beta-api"],
+            "triggeringChange": null
+        },
         "subscriptionsImpacted": [
-            "subs-prod-002"
+            {
+                "subscriptionId": "subs-prod-002",
+                "impactLevel": "medium",
+                "affectedResources": ["res-beta-api"],
+                "userImpact": {
+                    "usersAffected": 5000,
+                    "transactionsFailed": 1200,
+                    "duration": "20 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-10-22T14:30:00Z",
+                "source": "user-report"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-10-22T14:45:00Z",
+                "action": "Container restart"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-10-22T14:50:00Z",
+                "action": "Service operational"
+            }
         ]
     },
     {
@@ -35,11 +97,51 @@
         "createdDate": "2025-09-30",
         "severity": "High",
         "changeRelated": true,
-        "rootCause": "Databricks driver crash",
-        "rootCauseSubcategory": "Platform",
+        "rootCause": {
+            "category": "Platform",
+            "subcategory": "Runtime",
+            "description": "Databricks driver crash",
+            "relatedResources": ["res-gamma-cluster"],
+            "triggeringChange": "Databricks runtime upgrade"
+        },
         "subscriptionsImpacted": [
-            "subs-prod-003",
-            "subs-dev-002"
+            {
+                "subscriptionId": "subs-prod-003",
+                "impactLevel": "high",
+                "affectedResources": ["res-gamma-cluster"],
+                "userImpact": {
+                    "usersAffected": 200,
+                    "transactionsFailed": 0,
+                    "duration": "2 hours"
+                }
+            },
+            {
+                "subscriptionId": "subs-dev-002",
+                "impactLevel": "low",
+                "affectedResources": ["res-gamma-dev-cluster"],
+                "userImpact": {
+                    "usersAffected": 10,
+                    "transactionsFailed": 0,
+                    "duration": "30 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-09-30T08:00:00Z",
+                "source": "job-failure"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-09-30T09:30:00Z",
+                "action": "Rollback runtime version"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-09-30T10:00:00Z",
+                "action": "Jobs restarted successfully"
+            }
         ]
     },
     {
@@ -50,10 +152,41 @@
         "createdDate": "2025-11-18",
         "severity": "Medium",
         "changeRelated": true,
-        "rootCause": "AKS upgrade disrupted API server",
-        "rootCauseSubcategory": "Platform",
+        "rootCause": {
+            "category": "Platform",
+            "subcategory": "Upgrade",
+            "description": "AKS upgrade disrupted API server",
+            "relatedResources": ["res-delta-k8s"],
+            "triggeringChange": "Kubernetes version upgrade"
+        },
         "subscriptionsImpacted": [
-            "subs-prod-001"
+            {
+                "subscriptionId": "subs-prod-001",
+                "impactLevel": "medium",
+                "affectedResources": ["res-delta-k8s"],
+                "userImpact": {
+                    "usersAffected": 8000,
+                    "transactionsFailed": 3500,
+                    "duration": "15 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-11-18T16:00:00Z",
+                "source": "health-check"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-11-18T16:10:00Z",
+                "action": "API server stabilized"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-11-18T16:15:00Z",
+                "action": "All pods healthy"
+            }
         ]
     },
     {
@@ -64,11 +197,51 @@
         "createdDate": "2025-11-20",
         "severity": "High",
         "changeRelated": false,
-        "rootCause": "EventHub partition drift",
-        "rootCauseSubcategory": "Network",
+        "rootCause": {
+            "category": "Network",
+            "subcategory": "Partition",
+            "description": "EventHub partition drift",
+            "relatedResources": ["res-omega-eventhub"],
+            "triggeringChange": null
+        },
         "subscriptionsImpacted": [
-            "subs-prod-002",
-            "subs-prod-005"
+            {
+                "subscriptionId": "subs-prod-002",
+                "impactLevel": "high",
+                "affectedResources": ["res-omega-eventhub"],
+                "userImpact": {
+                    "usersAffected": 25000,
+                    "transactionsFailed": 12000,
+                    "duration": "1 hour"
+                }
+            },
+            {
+                "subscriptionId": "subs-prod-005",
+                "impactLevel": "medium",
+                "affectedResources": ["res-omega-eventhub-dr"],
+                "userImpact": {
+                    "usersAffected": 5000,
+                    "transactionsFailed": 2000,
+                    "duration": "30 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-11-20T11:00:00Z",
+                "source": "backlog-alert"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-11-20T11:45:00Z",
+                "action": "Partition rebalancing"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-11-20T12:00:00Z",
+                "action": "Backlog cleared"
+            }
         ]
     },
     {
@@ -79,10 +252,41 @@
         "createdDate": "2025-12-01",
         "severity": "High",
         "changeRelated": true,
-        "rootCause": "Certificate rotation misconfig",
-        "rootCauseSubcategory": "Security",
+        "rootCause": {
+            "category": "Security",
+            "subcategory": "Certificate",
+            "description": "Certificate rotation misconfig",
+            "relatedResources": ["res-lambda-aad"],
+            "triggeringChange": "Certificate rotation automation"
+        },
         "subscriptionsImpacted": [
-            "subs-prod-004"
+            {
+                "subscriptionId": "subs-prod-004",
+                "impactLevel": "high",
+                "affectedResources": ["res-lambda-aad"],
+                "userImpact": {
+                    "usersAffected": 50000,
+                    "transactionsFailed": 20000,
+                    "duration": "30 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-12-01T09:00:00Z",
+                "source": "auth-failure-spike"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-12-01T09:20:00Z",
+                "action": "Rollback certificate config"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-12-01T09:30:00Z",
+                "action": "Authentication restored"
+            }
         ]
     },
     {
@@ -93,10 +297,41 @@
         "createdDate": "2025-10-15",
         "severity": "High",
         "changeRelated": false,
-        "rootCause": "Failover ran before sync",
-        "rootCauseSubcategory": "Availability",
+        "rootCause": {
+            "category": "Availability",
+            "subcategory": "Failover",
+            "description": "Failover ran before sync",
+            "relatedResources": ["res-phi-sql"],
+            "triggeringChange": null
+        },
         "subscriptionsImpacted": [
-            "subs-prod-003"
+            {
+                "subscriptionId": "subs-prod-003",
+                "impactLevel": "high",
+                "affectedResources": ["res-phi-sql"],
+                "userImpact": {
+                    "usersAffected": 3000,
+                    "transactionsFailed": 500,
+                    "duration": "10 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-10-15T07:30:00Z",
+                "source": "database-alert"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-10-15T07:35:00Z",
+                "action": "Force sync from backup"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-10-15T07:40:00Z",
+                "action": "Primary database restored"
+            }
         ]
     },
     {
@@ -107,10 +342,41 @@
         "createdDate": "2025-11-27",
         "severity": "Medium",
         "changeRelated": true,
-        "rootCause": "Policy blocked subscription",
-        "rootCauseSubcategory": "Governance",
+        "rootCause": {
+            "category": "Governance",
+            "subcategory": "Policy",
+            "description": "Policy blocked subscription",
+            "relatedResources": ["res-kappa-eventgrid"],
+            "triggeringChange": "Azure Policy update"
+        },
         "subscriptionsImpacted": [
-            "subs-prod-005"
+            {
+                "subscriptionId": "subs-prod-005",
+                "impactLevel": "medium",
+                "affectedResources": ["res-kappa-eventgrid"],
+                "userImpact": {
+                    "usersAffected": 1000,
+                    "transactionsFailed": 300,
+                    "duration": "25 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-11-27T13:00:00Z",
+                "source": "deployment-failure"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-11-27T13:20:00Z",
+                "action": "Policy exemption applied"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-11-27T13:25:00Z",
+                "action": "Service operational"
+            }
         ]
     },
     {
@@ -121,10 +387,41 @@
         "createdDate": "2025-11-05",
         "severity": "Medium",
         "changeRelated": false,
-        "rootCause": "Index transformation slowed writes",
-        "rootCauseSubcategory": "Storage",
+        "rootCause": {
+            "category": "Storage",
+            "subcategory": "Index",
+            "description": "Index transformation slowed writes",
+            "relatedResources": ["res-zeta-cosmos"],
+            "triggeringChange": null
+        },
         "subscriptionsImpacted": [
-            "subs-prod-002"
+            {
+                "subscriptionId": "subs-prod-002",
+                "impactLevel": "medium",
+                "affectedResources": ["res-zeta-cosmos"],
+                "userImpact": {
+                    "usersAffected": 10000,
+                    "transactionsFailed": 2500,
+                    "duration": "40 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-11-05T15:00:00Z",
+                "source": "latency-alert"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-11-05T15:30:00Z",
+                "action": "Index transformation paused"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-11-05T15:40:00Z",
+                "action": "Performance normalized"
+            }
         ]
     },
     {
@@ -135,10 +432,41 @@
         "createdDate": "2025-12-03",
         "severity": "Low",
         "changeRelated": false,
-        "rootCause": "Partition key hot spot",
-        "rootCauseSubcategory": "Storage",
+        "rootCause": {
+            "category": "Storage",
+            "subcategory": "Throttling",
+            "description": "Partition key hot spot",
+            "relatedResources": ["res-theta-storage"],
+            "triggeringChange": null
+        },
         "subscriptionsImpacted": [
-            "subs-prod-004"
+            {
+                "subscriptionId": "subs-prod-004",
+                "impactLevel": "low",
+                "affectedResources": ["res-theta-storage"],
+                "userImpact": {
+                    "usersAffected": 100,
+                    "transactionsFailed": 50,
+                    "duration": "15 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-12-03T10:00:00Z",
+                "source": "throttling-metric"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-12-03T10:10:00Z",
+                "action": "Partition key distribution adjusted"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-12-03T10:15:00Z",
+                "action": "Throttling resolved"
+            }
         ]
     },
     {
@@ -149,10 +477,41 @@
         "createdDate": "2025-09-18",
         "severity": "Medium",
         "changeRelated": true,
-        "rootCause": "Pipeline rollback left stale slot",
-        "rootCauseSubcategory": "Deployment",
+        "rootCause": {
+            "category": "Deployment",
+            "subcategory": "Rollback",
+            "description": "Pipeline rollback left stale slot",
+            "relatedResources": ["res-sigma-webapp"],
+            "triggeringChange": "Deployment pipeline rollback"
+        },
         "subscriptionsImpacted": [
-            "subs-dev-001"
+            {
+                "subscriptionId": "subs-dev-001",
+                "impactLevel": "medium",
+                "affectedResources": ["res-sigma-webapp"],
+                "userImpact": {
+                    "usersAffected": 500,
+                    "transactionsFailed": 100,
+                    "duration": "20 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-09-18T12:00:00Z",
+                "source": "user-report"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-09-18T12:15:00Z",
+                "action": "Manual slot cleanup"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-09-18T12:20:00Z",
+                "action": "App deployed successfully"
+            }
         ]
     },
     {
@@ -163,11 +522,51 @@
         "createdDate": "2025-12-07",
         "severity": "High",
         "changeRelated": true,
-        "rootCause": "Bindings incompatible with extension",
-        "rootCauseSubcategory": "Application",
+        "rootCause": {
+            "category": "Application",
+            "subcategory": "Dependency",
+            "description": "Bindings incompatible with extension",
+            "relatedResources": ["res-tau-function"],
+            "triggeringChange": "Azure Functions extension upgrade"
+        },
         "subscriptionsImpacted": [
-            "subs-prod-005",
-            "subs-dev-002"
+            {
+                "subscriptionId": "subs-prod-005",
+                "impactLevel": "high",
+                "affectedResources": ["res-tau-function"],
+                "userImpact": {
+                    "usersAffected": 2000,
+                    "transactionsFailed": 1500,
+                    "duration": "35 minutes"
+                }
+            },
+            {
+                "subscriptionId": "subs-dev-002",
+                "impactLevel": "low",
+                "affectedResources": ["res-tau-function-dev"],
+                "userImpact": {
+                    "usersAffected": 20,
+                    "transactionsFailed": 10,
+                    "duration": "10 minutes"
+                }
+            }
+        ],
+        "timeline": [
+            {
+                "event": "detected",
+                "timestamp": "2025-12-07T14:00:00Z",
+                "source": "function-failure"
+            },
+            {
+                "event": "mitigated",
+                "timestamp": "2025-12-07T14:25:00Z",
+                "action": "Extension rollback"
+            },
+            {
+                "event": "resolved",
+                "timestamp": "2025-12-07T14:35:00Z",
+                "action": "Functions restored"
+            }
         ]
     }
 ]

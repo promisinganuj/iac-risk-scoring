@@ -3,120 +3,420 @@
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/payments",
         "serviceArtifacts": [
-            "webhook-service",
-            "payment-worker"
+            {
+                "name": "webhook-service",
+                "type": "microservice",
+                "buildConfig": {
+                    "dockerfile": "services/webhook/Dockerfile",
+                    "context": "services/webhook"
+                },
+                "dependencies": ["payment-worker", "auth-lib"]
+            },
+            {
+                "name": "payment-worker",
+                "type": "background-job",
+                "buildConfig": {
+                    "dockerfile": "workers/payment/Dockerfile",
+                    "context": "workers/payment"
+                },
+                "dependencies": ["database-lib", "queue-lib"]
+            }
         ],
-        "applicationCode": "Node.js/Express",
-        "iacConfiguration": "Terraform/rg-alpha-core"
+        "applicationCode": {
+            "language": "JavaScript",
+            "framework": "Express",
+            "version": "18.0.0",
+            "runtime": "Node.js"
+        },
+        "iacConfiguration": {
+            "tool": "Terraform",
+            "target": "rg-alpha-core",
+            "modules": ["network", "compute", "storage"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/beta-retail",
         "serviceArtifacts": [
-            "checkout-api",
-            "inventory-sync"
+            {
+                "name": "checkout-api",
+                "type": "api",
+                "buildConfig": {
+                    "dockerfile": "api/checkout/Dockerfile",
+                    "context": "api/checkout"
+                },
+                "dependencies": ["inventory-sync", "payment-gateway"]
+            },
+            {
+                "name": "inventory-sync",
+                "type": "service",
+                "buildConfig": {
+                    "dockerfile": "services/inventory/Dockerfile",
+                    "context": "services/inventory"
+                },
+                "dependencies": ["database-lib"]
+            }
         ],
-        "applicationCode": "Java/SpringBoot",
-        "iacConfiguration": "Bicep/rg-beta-api"
+        "applicationCode": {
+            "language": "Java",
+            "framework": "SpringBoot",
+            "version": "3.1.0",
+            "runtime": "JVM 17"
+        },
+        "iacConfiguration": {
+            "tool": "Bicep",
+            "target": "rg-beta-api",
+            "modules": ["app-service", "database"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/gamma-data",
         "serviceArtifacts": [
-            "model-trainer",
-            "feature-store"
+            {
+                "name": "model-trainer",
+                "type": "ml-pipeline",
+                "buildConfig": {
+                    "dockerfile": "ml/trainer/Dockerfile",
+                    "context": "ml/trainer"
+                },
+                "dependencies": ["feature-store", "data-loader"]
+            },
+            {
+                "name": "feature-store",
+                "type": "data-service",
+                "buildConfig": {
+                    "dockerfile": "ml/feature-store/Dockerfile",
+                    "context": "ml/feature-store"
+                },
+                "dependencies": ["storage-lib"]
+            }
         ],
-        "applicationCode": "Python/PyTorch",
-        "iacConfiguration": "Terragrunt/rg-gamma-analytics"
+        "applicationCode": {
+            "language": "Python",
+            "framework": "PyTorch",
+            "version": "2.0.0",
+            "runtime": "Python 3.11"
+        },
+        "iacConfiguration": {
+            "tool": "Terragrunt",
+            "target": "rg-gamma-analytics",
+            "modules": ["databricks", "storage", "networking"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/delta-core",
         "serviceArtifacts": [
-            "control-plane",
-            "auth-service"
+            {
+                "name": "control-plane",
+                "type": "platform-service",
+                "buildConfig": {
+                    "dockerfile": "platform/control-plane/Dockerfile",
+                    "context": "platform/control-plane"
+                },
+                "dependencies": ["auth-service", "api-gateway"]
+            },
+            {
+                "name": "auth-service",
+                "type": "security-service",
+                "buildConfig": {
+                    "dockerfile": "platform/auth/Dockerfile",
+                    "context": "platform/auth"
+                },
+                "dependencies": ["token-validator"]
+            }
         ],
-        "applicationCode": "Go/micro",
-        "iacConfiguration": "Bicep/rg-delta-platform"
+        "applicationCode": {
+            "language": "Go",
+            "framework": "micro",
+            "version": "1.21.0",
+            "runtime": "Go"
+        },
+        "iacConfiguration": {
+            "tool": "Bicep",
+            "target": "rg-delta-platform",
+            "modules": ["aks", "networking", "monitoring"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/omega-msg",
         "serviceArtifacts": [
-            "relay",
-            "event-proxy"
+            {
+                "name": "relay",
+                "type": "messaging-relay",
+                "buildConfig": {
+                    "dockerfile": "relay/Dockerfile",
+                    "context": "relay"
+                },
+                "dependencies": ["event-proxy"]
+            },
+            {
+                "name": "event-proxy",
+                "type": "proxy",
+                "buildConfig": {
+                    "dockerfile": "proxy/Dockerfile",
+                    "context": "proxy"
+                },
+                "dependencies": ["akka-streams"]
+            }
         ],
-        "applicationCode": "Scala/Akka",
-        "iacConfiguration": "Terraform/rg-omega-messaging"
+        "applicationCode": {
+            "language": "Scala",
+            "framework": "Akka",
+            "version": "2.8.0",
+            "runtime": "JVM 17"
+        },
+        "iacConfiguration": {
+            "tool": "Terraform",
+            "target": "rg-omega-messaging",
+            "modules": ["eventhub", "servicebus"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/lambda-id",
         "serviceArtifacts": [
-            "identity-gateway",
-            "policy-service"
+            {
+                "name": "identity-gateway",
+                "type": "gateway",
+                "buildConfig": {
+                    "dockerfile": "gateway/Dockerfile",
+                    "context": "gateway"
+                },
+                "dependencies": ["policy-service"]
+            },
+            {
+                "name": "policy-service",
+                "type": "policy-engine",
+                "buildConfig": {
+                    "dockerfile": "policy/Dockerfile",
+                    "context": "policy"
+                },
+                "dependencies": ["aad-lib"]
+            }
         ],
-        "applicationCode": "C#/.NET",
-        "iacConfiguration": "Bicep/rg-lambda-id"
+        "applicationCode": {
+            "language": "C#",
+            "framework": ".NET",
+            "version": "8.0",
+            "runtime": ".NET Core"
+        },
+        "iacConfiguration": {
+            "tool": "Bicep",
+            "target": "rg-lambda-id",
+            "modules": ["aad", "keyvault"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/phi-health",
         "serviceArtifacts": [
-            "patient-api",
-            "reporting"
+            {
+                "name": "patient-api",
+                "type": "api",
+                "buildConfig": {
+                    "dockerfile": "api/patient/Dockerfile",
+                    "context": "api/patient"
+                },
+                "dependencies": ["reporting", "audit-log"]
+            },
+            {
+                "name": "reporting",
+                "type": "service",
+                "buildConfig": {
+                    "dockerfile": "services/reporting/Dockerfile",
+                    "context": "services/reporting"
+                },
+                "dependencies": ["database-lib"]
+            }
         ],
-        "applicationCode": "Python/Django",
-        "iacConfiguration": "Terragrunt/rg-phi-health"
+        "applicationCode": {
+            "language": "Python",
+            "framework": "Django",
+            "version": "4.2.0",
+            "runtime": "Python 3.11"
+        },
+        "iacConfiguration": {
+            "tool": "Terragrunt",
+            "target": "rg-phi-health",
+            "modules": ["sql", "storage", "encryption"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/kappa-ads",
         "serviceArtifacts": [
-            "event-hub-ingest",
-            "bidder"
+            {
+                "name": "event-hub-ingest",
+                "type": "ingestion-service",
+                "buildConfig": {
+                    "dockerfile": "ingest/Dockerfile",
+                    "context": "ingest"
+                },
+                "dependencies": ["bidder"]
+            },
+            {
+                "name": "bidder",
+                "type": "bidding-engine",
+                "buildConfig": {
+                    "dockerfile": "bidder/Dockerfile",
+                    "context": "bidder"
+                },
+                "dependencies": ["ml-model"]
+            }
         ],
-        "applicationCode": "Java/Quarkus",
-        "iacConfiguration": "Terraform/rg-kappa-ads"
+        "applicationCode": {
+            "language": "Java",
+            "framework": "Quarkus",
+            "version": "3.2.0",
+            "runtime": "JVM 17"
+        },
+        "iacConfiguration": {
+            "tool": "Terraform",
+            "target": "rg-kappa-ads",
+            "modules": ["eventgrid", "functions"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/zeta-commerce",
         "serviceArtifacts": [
-            "product-catalog",
-            "order-processor"
+            {
+                "name": "product-catalog",
+                "type": "api",
+                "buildConfig": {
+                    "dockerfile": "api/catalog/Dockerfile",
+                    "context": "api/catalog"
+                },
+                "dependencies": ["order-processor"]
+            },
+            {
+                "name": "order-processor",
+                "type": "processor",
+                "buildConfig": {
+                    "dockerfile": "services/orders/Dockerfile",
+                    "context": "services/orders"
+                },
+                "dependencies": ["payment-gateway"]
+            }
         ],
-        "applicationCode": "JavaScript/Node",
-        "iacConfiguration": "Bicep/rg-zeta-commerce"
+        "applicationCode": {
+            "language": "JavaScript",
+            "framework": "Node",
+            "version": "20.0.0",
+            "runtime": "Node.js"
+        },
+        "iacConfiguration": {
+            "tool": "Bicep",
+            "target": "rg-zeta-commerce",
+            "modules": ["cosmos", "app-service"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/theta-logs",
         "serviceArtifacts": [
-            "log-collector",
-            "alerting"
+            {
+                "name": "log-collector",
+                "type": "collector",
+                "buildConfig": {
+                    "dockerfile": "collector/Dockerfile",
+                    "context": "collector"
+                },
+                "dependencies": ["alerting"]
+            },
+            {
+                "name": "alerting",
+                "type": "alerting-service",
+                "buildConfig": {
+                    "dockerfile": "alerting/Dockerfile",
+                    "context": "alerting"
+                },
+                "dependencies": ["notification-lib"]
+            }
         ],
-        "applicationCode": "Go/Logrus",
-        "iacConfiguration": "Terragrunt/rg-theta-observability"
+        "applicationCode": {
+            "language": "Go",
+            "framework": "Logrus",
+            "version": "1.21.0",
+            "runtime": "Go"
+        },
+        "iacConfiguration": {
+            "tool": "Terragrunt",
+            "target": "rg-theta-observability",
+            "modules": ["storage", "monitoring"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/sigma-collab",
         "serviceArtifacts": [
-            "video-service",
-            "chat-service"
+            {
+                "name": "video-service",
+                "type": "media-service",
+                "buildConfig": {
+                    "dockerfile": "services/video/Dockerfile",
+                    "context": "services/video"
+                },
+                "dependencies": ["chat-service"]
+            },
+            {
+                "name": "chat-service",
+                "type": "realtime-service",
+                "buildConfig": {
+                    "dockerfile": "services/chat/Dockerfile",
+                    "context": "services/chat"
+                },
+                "dependencies": ["websocket-lib"]
+            }
         ],
-        "applicationCode": "TypeScript/React",
-        "iacConfiguration": "Bicep/rg-sigma-collab"
+        "applicationCode": {
+            "language": "TypeScript",
+            "framework": "React",
+            "version": "18.0.0",
+            "runtime": "Node.js"
+        },
+        "iacConfiguration": {
+            "tool": "Bicep",
+            "target": "rg-sigma-collab",
+            "modules": ["static-web-apps", "cdn"]
+        }
     },
     {
         "sourceControlType": "GitHub",
         "sourceControlURI": "https://github.com/contoso/tau-observ",
         "serviceArtifacts": [
-            "event-map",
-            "metrics-pipeline"
+            {
+                "name": "event-map",
+                "type": "event-processor",
+                "buildConfig": {
+                    "dockerfile": "processors/event-map/Dockerfile",
+                    "context": "processors/event-map"
+                },
+                "dependencies": ["metrics-pipeline"]
+            },
+            {
+                "name": "metrics-pipeline",
+                "type": "pipeline",
+                "buildConfig": {
+                    "dockerfile": "pipelines/metrics/Dockerfile",
+                    "context": "pipelines/metrics"
+                },
+                "dependencies": ["storage-lib"]
+            }
         ],
-        "applicationCode": "Python/Flask",
-        "iacConfiguration": "Terraform/rg-tau-observability"
+        "applicationCode": {
+            "language": "Python",
+            "framework": "Flask",
+            "version": "3.0.0",
+            "runtime": "Python 3.11"
+        },
+        "iacConfiguration": {
+            "tool": "Terraform",
+            "target": "rg-tau-observability",
+            "modules": ["functions", "storage"]
+        }
     }
 ]

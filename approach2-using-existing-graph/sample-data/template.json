@@ -5,9 +5,62 @@
         "resourceGroup": "rg-alpha-core",
         "resourceType": "Microsoft.Web/sites",
         "properties": {
-            "sku": "S1",
-            "runtime": "node"
-        }
+            "compute": {
+                "sku": "S1",
+                "runtime": "node",
+                "instances": 2
+            },
+            "network": {
+                "vnetIntegration": true,
+                "privateEndpoint": false
+            },
+            "storage": {
+                "storageAccountType": "Standard_LRS"
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "alpha-networking",
+                "version": "2.1",
+                "required": true
+            },
+            {
+                "templateName": "alpha-keyvault",
+                "version": "1.5",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "environmentName",
+                "type": "string",
+                "default": "prod",
+                "validation": {
+                    "allowedValues": ["dev", "staging", "prod"]
+                }
+            },
+            {
+                "name": "instanceCount",
+                "type": "int",
+                "default": 2,
+                "validation": {
+                    "min": 1,
+                    "max": 10
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "appServiceId",
+                "type": "resourceId",
+                "description": "Resource ID of the App Service"
+            },
+            {
+                "name": "defaultHostname",
+                "type": "string",
+                "description": "Default hostname of the App Service"
+            }
+        ]
     },
     {
         "templateVersion": "1.1",
@@ -15,9 +68,59 @@
         "resourceGroup": "rg-beta-api",
         "resourceType": "Microsoft.Web/sites",
         "properties": {
-            "sku": "P1v2",
-            "runtime": "dotnet"
-        }
+            "compute": {
+                "sku": "P1v2",
+                "runtime": "dotnet",
+                "instances": 3
+            },
+            "network": {
+                "vnetIntegration": true,
+                "privateEndpoint": true
+            },
+            "storage": {
+                "storageAccountType": "Premium_LRS"
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "beta-networking",
+                "version": "1.0",
+                "required": true
+            },
+            {
+                "templateName": "beta-sqldb",
+                "version": "2.0",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "environmentName",
+                "type": "string",
+                "default": "prod",
+                "validation": {
+                    "allowedValues": ["dev", "staging", "prod"]
+                }
+            },
+            {
+                "name": "enableAuth",
+                "type": "bool",
+                "default": true,
+                "validation": {}
+            }
+        ],
+        "outputs": [
+            {
+                "name": "apiEndpoint",
+                "type": "string",
+                "description": "API endpoint URL"
+            },
+            {
+                "name": "resourceId",
+                "type": "resourceId",
+                "description": "Resource ID of the API app"
+            }
+        ]
     },
     {
         "templateVersion": "2.0",
@@ -25,9 +128,54 @@
         "resourceGroup": "rg-gamma-analytics",
         "resourceType": "Microsoft.Storage/storageAccounts",
         "properties": {
-            "tier": "Standard",
-            "replication": "ZRS"
-        }
+            "compute": {},
+            "network": {
+                "vnetIntegration": true,
+                "privateEndpoint": true,
+                "firewallRules": ["10.0.0.0/8"]
+            },
+            "storage": {
+                "tier": "Standard",
+                "replication": "ZRS",
+                "enableHierarchicalNamespace": true
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "gamma-networking",
+                "version": "1.2",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "storageAccountName",
+                "type": "string",
+                "default": "gammadatalake",
+                "validation": {
+                    "minLength": 3,
+                    "maxLength": 24
+                }
+            },
+            {
+                "name": "enableDataLake",
+                "type": "bool",
+                "default": true,
+                "validation": {}
+            }
+        ],
+        "outputs": [
+            {
+                "name": "storageAccountId",
+                "type": "resourceId",
+                "description": "Resource ID of the storage account"
+            },
+            {
+                "name": "primaryEndpoint",
+                "type": "string",
+                "description": "Primary blob endpoint"
+            }
+        ]
     },
     {
         "templateVersion": "3.2",
@@ -35,9 +183,68 @@
         "resourceGroup": "rg-delta-platform",
         "resourceType": "Microsoft.ContainerService/managedClusters",
         "properties": {
-            "nodeCount": "3",
-            "vmSize": "Standard_D4"
-        }
+            "compute": {
+                "nodeCount": 3,
+                "vmSize": "Standard_D4",
+                "autoScaling": true
+            },
+            "network": {
+                "networkPolicy": "azure",
+                "serviceCidr": "10.0.0.0/16",
+                "dnsServiceIP": "10.0.0.10"
+            },
+            "storage": {
+                "osDiskType": "Managed",
+                "osDiskSize": 128
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "delta-networking",
+                "version": "3.0",
+                "required": true
+            },
+            {
+                "templateName": "delta-acr",
+                "version": "1.8",
+                "required": true
+            },
+            {
+                "templateName": "delta-monitoring",
+                "version": "2.5",
+                "required": false
+            }
+        ],
+        "parameters": [
+            {
+                "name": "kubernetesVersion",
+                "type": "string",
+                "default": "1.27",
+                "validation": {
+                    "pattern": "^1\\.(26|27|28)$"
+                }
+            },
+            {
+                "name": "nodePoolSize",
+                "type": "string",
+                "default": "Standard_D4",
+                "validation": {
+                    "allowedValues": ["Standard_D2", "Standard_D4", "Standard_D8"]
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "clusterFqdn",
+                "type": "string",
+                "description": "Cluster FQDN"
+            },
+            {
+                "name": "kubeletIdentity",
+                "type": "principalId",
+                "description": "Kubelet managed identity"
+            }
+        ]
     },
     {
         "templateVersion": "1.4",
@@ -45,9 +252,58 @@
         "resourceGroup": "rg-omega-messaging",
         "resourceType": "Microsoft.EventHub/namespaces",
         "properties": {
-            "sku": "Standard",
-            "capacity": "2"
-        }
+            "compute": {
+                "sku": "Standard",
+                "capacity": 2,
+                "throughputUnits": 5
+            },
+            "network": {
+                "vnetIntegration": false,
+                "privateEndpoint": false
+            },
+            "storage": {
+                "retentionDays": 7
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "omega-monitoring",
+                "version": "1.0",
+                "required": false
+            }
+        ],
+        "parameters": [
+            {
+                "name": "namespaceName",
+                "type": "string",
+                "default": "omega-events",
+                "validation": {
+                    "minLength": 6,
+                    "maxLength": 50
+                }
+            },
+            {
+                "name": "throughputUnits",
+                "type": "int",
+                "default": 5,
+                "validation": {
+                    "min": 1,
+                    "max": 20
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "namespaceId",
+                "type": "resourceId",
+                "description": "Event Hub namespace ID"
+            },
+            {
+                "name": "connectionString",
+                "type": "secureString",
+                "description": "Primary connection string"
+            }
+        ]
     },
     {
         "templateVersion": "1.0",
@@ -55,9 +311,57 @@
         "resourceGroup": "rg-lambda-id",
         "resourceType": "Microsoft.AAD/domainServices",
         "properties": {
-            "dnsName": "lambda.contoso.com",
-            "sku": "Standard"
-        }
+            "compute": {},
+            "network": {
+                "vnetIntegration": true,
+                "privateEndpoint": true
+            },
+            "storage": {
+                "replicaCount": 2
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "lambda-networking",
+                "version": "1.5",
+                "required": true
+            },
+            {
+                "templateName": "lambda-keyvault",
+                "version": "1.0",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "domainName",
+                "type": "string",
+                "default": "lambda.contoso.com",
+                "validation": {
+                    "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"
+                }
+            },
+            {
+                "name": "sku",
+                "type": "string",
+                "default": "Standard",
+                "validation": {
+                    "allowedValues": ["Standard", "Enterprise"]
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "domainServiceId",
+                "type": "resourceId",
+                "description": "Domain service resource ID"
+            },
+            {
+                "name": "ldapsEndpoint",
+                "type": "string",
+                "description": "LDAPS endpoint"
+            }
+        ]
     },
     {
         "templateVersion": "2.1",
@@ -65,9 +369,61 @@
         "resourceGroup": "rg-phi-health",
         "resourceType": "Microsoft.Sql/servers/databases",
         "properties": {
-            "collation": "SQL_Latin1_General_CP1_CI_AS",
-            "backupDaily": "true"
-        }
+            "compute": {
+                "edition": "Premium",
+                "serviceObjective": "P2"
+            },
+            "network": {
+                "vnetIntegration": true,
+                "privateEndpoint": true
+            },
+            "storage": {
+                "collation": "SQL_Latin1_General_CP1_CI_AS",
+                "maxSizeBytes": 536870912000,
+                "backupRetentionDays": 35
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "phi-sqlserver",
+                "version": "2.0",
+                "required": true
+            },
+            {
+                "templateName": "phi-encryption",
+                "version": "1.2",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "databaseName",
+                "type": "string",
+                "default": "phi-health",
+                "validation": {
+                    "minLength": 1,
+                    "maxLength": 128
+                }
+            },
+            {
+                "name": "enableEncryption",
+                "type": "bool",
+                "default": true,
+                "validation": {}
+            }
+        ],
+        "outputs": [
+            {
+                "name": "databaseId",
+                "type": "resourceId",
+                "description": "Database resource ID"
+            },
+            {
+                "name": "connectionString",
+                "type": "secureString",
+                "description": "Database connection string"
+            }
+        ]
     },
     {
         "templateVersion": "1.3",
@@ -75,8 +431,45 @@
         "resourceGroup": "rg-kappa-ads",
         "resourceType": "Microsoft.EventGrid/namespaces",
         "properties": {
-            "topics": "billing|clicks"
-        }
+            "compute": {},
+            "network": {
+                "vnetIntegration": false,
+                "privateEndpoint": false
+            },
+            "storage": {
+                "topicsList": ["billing", "clicks"]
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "kappa-monitoring",
+                "version": "1.0",
+                "required": false
+            }
+        ],
+        "parameters": [
+            {
+                "name": "namespaceName",
+                "type": "string",
+                "default": "kappa-events",
+                "validation": {
+                    "minLength": 3,
+                    "maxLength": 50
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "namespaceId",
+                "type": "resourceId",
+                "description": "Event Grid namespace ID"
+            },
+            {
+                "name": "endpoint",
+                "type": "string",
+                "description": "Event Grid endpoint"
+            }
+        ]
     },
     {
         "templateVersion": "2.2",
@@ -84,9 +477,58 @@
         "resourceGroup": "rg-zeta-commerce",
         "resourceType": "Microsoft.DocumentDB/databaseAccounts",
         "properties": {
-            "consistency": "Session",
-            "multiRegion": "true"
-        }
+            "compute": {
+                "throughput": 10000,
+                "autoScale": true
+            },
+            "network": {
+                "vnetIntegration": true,
+                "privateEndpoint": true
+            },
+            "storage": {
+                "consistency": "Session",
+                "multiRegion": true,
+                "regions": ["eastus", "westus"]
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "zeta-networking",
+                "version": "1.0",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "accountName",
+                "type": "string",
+                "default": "zeta-cosmos",
+                "validation": {
+                    "minLength": 3,
+                    "maxLength": 44
+                }
+            },
+            {
+                "name": "consistencyLevel",
+                "type": "string",
+                "default": "Session",
+                "validation": {
+                    "allowedValues": ["Eventual", "Session", "Strong"]
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "cosmosAccountId",
+                "type": "resourceId",
+                "description": "Cosmos DB account ID"
+            },
+            {
+                "name": "primaryEndpoint",
+                "type": "string",
+                "description": "Primary endpoint URL"
+            }
+        ]
     },
     {
         "templateVersion": "1.5",
@@ -94,9 +536,47 @@
         "resourceGroup": "rg-theta-observability",
         "resourceType": "Microsoft.Storage/storageAccounts",
         "properties": {
-            "tier": "Premium",
-            "accessTier": "Hot"
-        }
+            "compute": {},
+            "network": {
+                "vnetIntegration": true,
+                "privateEndpoint": true
+            },
+            "storage": {
+                "tier": "Premium",
+                "accessTier": "Hot",
+                "replication": "LRS"
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "theta-networking",
+                "version": "1.1",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "storageAccountName",
+                "type": "string",
+                "default": "thetalogs",
+                "validation": {
+                    "minLength": 3,
+                    "maxLength": 24
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "storageAccountId",
+                "type": "resourceId",
+                "description": "Storage account ID"
+            },
+            {
+                "name": "blobEndpoint",
+                "type": "string",
+                "description": "Blob endpoint URL"
+            }
+        ]
     },
     {
         "templateVersion": "1.0",
@@ -104,9 +584,46 @@
         "resourceGroup": "rg-sigma-collab",
         "resourceType": "Microsoft.Web/sites",
         "properties": {
-            "sku": "S1",
-            "stack": "dotnet"
-        }
+            "compute": {
+                "sku": "S1",
+                "stack": "dotnet"
+            },
+            "network": {
+                "vnetIntegration": false,
+                "privateEndpoint": false
+            },
+            "storage": {}
+        },
+        "dependencies": [
+            {
+                "templateName": "sigma-cdn",
+                "version": "1.0",
+                "required": false
+            }
+        ],
+        "parameters": [
+            {
+                "name": "appName",
+                "type": "string",
+                "default": "sigma-webapp",
+                "validation": {
+                    "minLength": 2,
+                    "maxLength": 60
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "appId",
+                "type": "resourceId",
+                "description": "Web app resource ID"
+            },
+            {
+                "name": "url",
+                "type": "string",
+                "description": "Web app URL"
+            }
+        ]
     },
     {
         "templateVersion": "1.0",
@@ -114,8 +631,60 @@
         "resourceGroup": "rg-tau-observability",
         "resourceType": "Microsoft.Web/sites",
         "properties": {
-            "functions": "3",
-            "runtime": "python"
-        }
+            "compute": {
+                "functions": 3,
+                "runtime": "python"
+            },
+            "network": {
+                "vnetIntegration": false,
+                "privateEndpoint": false
+            },
+            "storage": {
+                "storageConnectionString": "linked"
+            }
+        },
+        "dependencies": [
+            {
+                "templateName": "tau-storage",
+                "version": "1.0",
+                "required": true
+            },
+            {
+                "templateName": "tau-appinsights",
+                "version": "1.0",
+                "required": true
+            }
+        ],
+        "parameters": [
+            {
+                "name": "functionAppName",
+                "type": "string",
+                "default": "tau-functions",
+                "validation": {
+                    "minLength": 2,
+                    "maxLength": 60
+                }
+            },
+            {
+                "name": "pythonVersion",
+                "type": "string",
+                "default": "3.11",
+                "validation": {
+                    "allowedValues": ["3.9", "3.10", "3.11"]
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "functionAppId",
+                "type": "resourceId",
+                "description": "Function app resource ID"
+            },
+            {
+                "name": "defaultHostKey",
+                "type": "secureString",
+                "description": "Function app default host key"
+            }
+        ]
     }
 ]

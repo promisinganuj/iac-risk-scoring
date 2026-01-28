@@ -1,6 +1,7 @@
 resourceName,displayName,resourceType,subscriptionId,resourceGroup,location,tags.env,tags.owner,tags.serviceId
 res-alpha-app,Alpha Payments Web App,Microsoft.Web/sites,subs-prod-001,rg-alpha-core,eastus2,prod,payments,A56C6700-6666-4444-AAAA-000F3B9CC999
 res-alpha-lb,Alpha Payments Load Balancer,Microsoft.Network/loadBalancers,subs-prod-001,rg-alpha-core,eastus2,prod,payments,A56C6700-6666-4444-AAAA-000F3B9CC999
+res-alpha-db,Alpha Payments Database,Microsoft.Sql/servers/databases,subs-prod-001,rg-alpha-core,eastus2,prod,payments,A56C6700-6666-4444-AAAA-000F3B9CC999
 res-beta-api,Beta Retail API,Microsoft.Web/sites,subs-prod-002,rg-beta-api,centralus,prod,retail,B77D8800-7777-5555-BBBB-001F4C9DD888
 res-gamma-lake,Gamma Insights Data Lake,Microsoft.Storage/storageAccounts,subs-prod-003,rg-gamma-analytics,eastus2,prod,data,C88E9900-8888-6666-CCCC-002F5D9EE777
 res-gamma-cluster,Gamma Insights Databricks Cluster,Microsoft.Databricks/workspaces,subs-prod-003,rg-gamma-analytics,eastus2,prod,data,C88E9900-8888-6666-CCCC-002F5D9EE777

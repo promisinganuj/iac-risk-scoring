@@ -26,6 +26,19 @@
         }
     },
     {
+        "resourceName": "res-alpha-db",
+        "displayName": "Alpha Payments Database",
+        "resourceType": "Microsoft.Sql/servers/databases",
+        "resourceGroup": "rg-alpha-core",
+        "subscriptionId": "subs-prod-001",
+        "location": "eastus2",
+        "tags": {
+            "env": "prod",
+            "owner": "payments",
+            "serviceId": "A56C6700-6666-4444-AAAA-000F3B9CC999"
+        }
+    },
+    {
         "resourceName": "res-beta-api",
         "displayName": "Beta Retail API",
         "resourceType": "Microsoft.Web/sites",

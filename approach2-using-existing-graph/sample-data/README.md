@@ -28,7 +28,7 @@ Each file represents a different entity type in the system:
 
 | File | Entity Type | Description | Records |
 |------|-------------|-------------|---------|
-| `azure_resources` | AzureResource | Azure cloud resources (VMs, databases, storage) | 24 |
+| `azure_resources` | AzureResource | Azure cloud resources (VMs, databases, storage) | 25 |
 | `azure_service_tree` | Service | Logical services owning resources | 12 |
 | `ev2_deployment` | Deployment | EV2 deployment events | 12 |
 | `icm` | Incident | ICM incident records | 12 |

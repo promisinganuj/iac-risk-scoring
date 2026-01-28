@@ -370,6 +370,184 @@ def score_change(
             )
         )
 
+    # Rule 8: deployment stage failures.
+    stage_failures = _require_int(evidence, "deployment_stage_failures")
+    if stage_failures is None:
+        unknown("deployment_stage_failures")
+        factors.append(
+            ScoreFactor(
+                factor_id="deployment.stage_failures",
+                title="Recent deployment stage failures",
+                status="unknown",
+                points=0,
+                max_points=15,
+                reason="deployment_stage_failures is missing.",
+                evidence={"deployment_stage_failures": None},
+            )
+        )
+    else:
+        if stage_failures >= 3:
+            pts = 15
+        elif stage_failures >= 2:
+            pts = 10
+        elif stage_failures == 1:
+            pts = 5
+        else:
+            pts = 0
+        factors.append(
+            ScoreFactor(
+                factor_id="deployment.stage_failures",
+                title="Recent deployment stage failures",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=15,
+                reason="Failed deployment stages indicate deployment instability.",
+                evidence={"deployment_stage_failures": stage_failures},
+            )
+        )
+
+    # Rule 9: mean time to mitigate (MTTM).
+    avg_mttm_minutes = _require_int(evidence, "avg_mttm_minutes")
+    if avg_mttm_minutes is None:
+        unknown("avg_mttm_minutes")
+        factors.append(
+            ScoreFactor(
+                factor_id="incident.mttm",
+                title="Slow incident mitigation",
+                status="unknown",
+                points=0,
+                max_points=10,
+                reason="avg_mttm_minutes is missing.",
+                evidence={"avg_mttm_minutes": None},
+            )
+        )
+    else:
+        if avg_mttm_minutes >= 60:
+            pts = 10
+        elif avg_mttm_minutes >= 30:
+            pts = 7
+        elif avg_mttm_minutes >= 15:
+            pts = 4
+        else:
+            pts = 0
+        factors.append(
+            ScoreFactor(
+                factor_id="incident.mttm",
+                title="Slow incident mitigation",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=10,
+                reason="Slow mitigation suggests recovery challenges.",
+                evidence={"avg_mttm_minutes": avg_mttm_minutes},
+            )
+        )
+
+    # Rule 10: deep artifact dependencies.
+    max_dependency_depth = _require_int(evidence, "max_dependency_depth")
+    if max_dependency_depth is None:
+        unknown("max_dependency_depth")
+        factors.append(
+            ScoreFactor(
+                factor_id="artifact.deep_deps",
+                title="Deep artifact dependency chains",
+                status="unknown",
+                points=0,
+                max_points=10,
+                reason="max_dependency_depth is missing.",
+                evidence={"max_dependency_depth": None},
+            )
+        )
+    else:
+        if max_dependency_depth >= 3:
+            pts = 10
+        elif max_dependency_depth == 2:
+            pts = 5
+        else:
+            pts = 0
+        factors.append(
+            ScoreFactor(
+                factor_id="artifact.deep_deps",
+                title="Deep artifact dependency chains",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=10,
+                reason="Deep dependency chains increase cascading failure risk.",
+                evidence={"max_dependency_depth": max_dependency_depth},
+            )
+        )
+
+    # Rule 11: peer resources in same ResourceGroup.
+    peer_resource_count = _require_int(evidence, "peer_resource_count")
+    if peer_resource_count is None:
+        unknown("peer_resource_count")
+        factors.append(
+            ScoreFactor(
+                factor_id="resource.peer_impact",
+                title="Resources in same ResourceGroup",
+                status="unknown",
+                points=0,
+                max_points=8,
+                reason="peer_resource_count is missing.",
+                evidence={"peer_resource_count": None},
+            )
+        )
+    else:
+        if peer_resource_count >= 10:
+            pts = 8
+        elif peer_resource_count >= 5:
+            pts = 5
+        elif peer_resource_count >= 2:
+            pts = 3
+        else:
+            pts = 0
+        factors.append(
+            ScoreFactor(
+                factor_id="resource.peer_impact",
+                title="Resources in same ResourceGroup",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=8,
+                reason="More peer resources increase blast radius.",
+                evidence={"peer_resource_count": peer_resource_count},
+            )
+        )
+
+    # Rule 12: incident recurrence.
+    related_incidents = _require_int(evidence, "related_incidents")
+    if related_incidents is None:
+        unknown("related_incidents")
+        factors.append(
+            ScoreFactor(
+                factor_id="incident.recurrence",
+                title="Similar past incidents",
+                status="unknown",
+                points=0,
+                max_points=12,
+                reason="related_incidents is missing.",
+                evidence={"related_incidents": None},
+            )
+        )
+    else:
+        if related_incidents >= 3:
+            pts = 12
+        elif related_incidents >= 2:
+            pts = 8
+        elif related_incidents == 1:
+            pts = 4
+        else:
+            pts = 0
+        factors.append(
+            ScoreFactor(
+                factor_id="incident.recurrence",
+                title="Similar past incidents",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=12,
+                reason="Recurring incidents suggest systematic issues.",
+                evidence={"related_incidents": related_incidents},
+            )
+        )
+
     score = sum(f.points for f in factors)
     if score > 100:
         score = 100

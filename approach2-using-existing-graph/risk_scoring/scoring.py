@@ -548,6 +548,53 @@ def score_change(
             )
         )
 
+    # Rule 13: template complexity.
+    required_dependency_count = _require_int(evidence, "template_required_dependency_count")
+    max_dependency_depth = _require_int(evidence, "template_max_dependency_depth")
+    
+    if required_dependency_count is None or max_dependency_depth is None:
+        if required_dependency_count is None:
+            unknown("template_required_dependency_count")
+        if max_dependency_depth is None:
+            unknown("template_max_dependency_depth")
+        factors.append(
+            ScoreFactor(
+                factor_id="template.complexity",
+                title="Template dependency complexity",
+                status="unknown",
+                points=0,
+                max_points=10,
+                reason="Template dependency data is missing.",
+                evidence={
+                    "template_required_dependency_count": required_dependency_count,
+                    "template_max_dependency_depth": max_dependency_depth,
+                },
+            )
+        )
+    else:
+        pts = 0
+        # Award 5 points if > 3 required dependencies
+        if required_dependency_count > 3:
+            pts += 5
+        # Award 5 points if dependency chain depth > 2 hops
+        if max_dependency_depth > 2:
+            pts += 5
+        
+        factors.append(
+            ScoreFactor(
+                factor_id="template.complexity",
+                title="Template dependency complexity",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=10,
+                reason="Complex template dependencies increase deployment risk.",
+                evidence={
+                    "template_required_dependency_count": required_dependency_count,
+                    "template_max_dependency_depth": max_dependency_depth,
+                },
+            )
+        )
+
     score = sum(f.points for f in factors)
     if score > 100:
         score = 100

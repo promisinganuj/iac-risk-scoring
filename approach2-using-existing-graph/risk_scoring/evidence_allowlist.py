@@ -298,6 +298,24 @@ ALLOWLIST: Dict[str, QuerySpec] = {
         max_limit=10,
         default_limit=1,
     ),
+    "t5.template_dependencies": QuerySpec(
+        query_id="t5.template_dependencies",
+        cypher=(
+            "MATCH (d:Deployment {rolloutId: $rolloutId})-[:USES_TEMPLATE]->(t:Template)\n"
+            "OPTIONAL MATCH path = (t)-[:DEPENDS_ON_TEMPLATE*1..3]->(dep:Template)\n"
+            "WITH t, collect(DISTINCT {name: dep.templateName, version: dep.templateVersion, "
+            "required: head([rel IN relationships(path) WHERE startNode(rel) = t | rel.required]), "
+            "depth: length(path)}) AS dependencies\n"
+            "RETURN t.templateName AS templateName, t.templateVersion AS templateVersion, "
+            "       dependencies, "
+            "       size([d IN dependencies WHERE d.required = true]) AS requiredDependencyCount, "
+            "       coalesce(max([d IN dependencies | d.depth]), 0) AS maxDependencyDepth\n"
+            "LIMIT $limit"
+        ),
+        params=(ParamSpec("rolloutId", "str", required=True, max_len=128),),
+        max_limit=25,
+        default_limit=5,
+    ),
 }
 
 

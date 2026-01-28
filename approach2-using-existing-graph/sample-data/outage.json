@@ -30,17 +30,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-11-04T10:15:00Z",
-                "source": "monitoring-alert"
+                "source": "monitoring-alert",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-11-04T10:45:00Z",
-                "action": "Manual certificate renewal"
+                "action": "Manual certificate renewal",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-11-04T11:00:00Z",
-                "action": "All services restored"
+                "action": "All services restored",
+                "order": 3
             }
         ]
     },
@@ -75,17 +78,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-10-22T14:30:00Z",
-                "source": "user-report"
+                "source": "user-report",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-10-22T14:45:00Z",
-                "action": "Container restart"
+                "action": "Container restart",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-10-22T14:50:00Z",
-                "action": "Service operational"
+                "action": "Service operational",
+                "order": 3
             }
         ]
     },
@@ -130,17 +136,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-09-30T08:00:00Z",
-                "source": "job-failure"
+                "source": "job-failure",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-09-30T09:30:00Z",
-                "action": "Rollback runtime version"
+                "action": "Rollback runtime version",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-09-30T10:00:00Z",
-                "action": "Jobs restarted successfully"
+                "action": "Jobs restarted successfully",
+                "order": 3
             }
         ]
     },
@@ -175,17 +184,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-11-18T16:00:00Z",
-                "source": "health-check"
+                "source": "health-check",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-11-18T16:10:00Z",
-                "action": "API server stabilized"
+                "action": "API server stabilized",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-11-18T16:15:00Z",
-                "action": "All pods healthy"
+                "action": "All pods healthy",
+                "order": 3
             }
         ]
     },
@@ -230,17 +242,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-11-20T11:00:00Z",
-                "source": "backlog-alert"
+                "source": "backlog-alert",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-11-20T11:45:00Z",
-                "action": "Partition rebalancing"
+                "action": "Partition rebalancing",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-11-20T12:00:00Z",
-                "action": "Backlog cleared"
+                "action": "Backlog cleared",
+                "order": 3
             }
         ]
     },
@@ -275,17 +290,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-12-01T09:00:00Z",
-                "source": "auth-failure-spike"
+                "source": "auth-failure-spike",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-12-01T09:20:00Z",
-                "action": "Rollback certificate config"
+                "action": "Rollback certificate config",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-12-01T09:30:00Z",
-                "action": "Authentication restored"
+                "action": "Authentication restored",
+                "order": 3
             }
         ]
     },
@@ -320,17 +338,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-10-15T07:30:00Z",
-                "source": "database-alert"
+                "source": "database-alert",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-10-15T07:35:00Z",
-                "action": "Force sync from backup"
+                "action": "Force sync from backup",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-10-15T07:40:00Z",
-                "action": "Primary database restored"
+                "action": "Primary database restored",
+                "order": 3
             }
         ]
     },
@@ -365,17 +386,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-11-27T13:00:00Z",
-                "source": "deployment-failure"
+                "source": "deployment-failure",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-11-27T13:20:00Z",
-                "action": "Policy exemption applied"
+                "action": "Policy exemption applied",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-11-27T13:25:00Z",
-                "action": "Service operational"
+                "action": "Service operational",
+                "order": 3
             }
         ]
     },
@@ -410,17 +434,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-11-05T15:00:00Z",
-                "source": "latency-alert"
+                "source": "latency-alert",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-11-05T15:30:00Z",
-                "action": "Index transformation paused"
+                "action": "Index transformation paused",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-11-05T15:40:00Z",
-                "action": "Performance normalized"
+                "action": "Performance normalized",
+                "order": 3
             }
         ]
     },
@@ -455,17 +482,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-12-03T10:00:00Z",
-                "source": "throttling-metric"
+                "source": "throttling-metric",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-12-03T10:10:00Z",
-                "action": "Partition key distribution adjusted"
+                "action": "Partition key distribution adjusted",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-12-03T10:15:00Z",
-                "action": "Throttling resolved"
+                "action": "Throttling resolved",
+                "order": 3
             }
         ]
     },
@@ -500,17 +530,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-09-18T12:00:00Z",
-                "source": "user-report"
+                "source": "user-report",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-09-18T12:15:00Z",
-                "action": "Manual slot cleanup"
+                "action": "Manual slot cleanup",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-09-18T12:20:00Z",
-                "action": "App deployed successfully"
+                "action": "App deployed successfully",
+                "order": 3
             }
         ]
     },
@@ -555,17 +588,20 @@
             {
                 "event": "detected",
                 "timestamp": "2025-12-07T14:00:00Z",
-                "source": "function-failure"
+                "source": "function-failure",
+                "order": 1
             },
             {
                 "event": "mitigated",
                 "timestamp": "2025-12-07T14:25:00Z",
-                "action": "Extension rollback"
+                "action": "Extension rollback",
+                "order": 2
             },
             {
                 "event": "resolved",
                 "timestamp": "2025-12-07T14:35:00Z",
-                "action": "Functions restored"
+                "action": "Functions restored",
+                "order": 3
             }
         ]
     }

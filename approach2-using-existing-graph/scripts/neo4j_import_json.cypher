@@ -257,7 +257,8 @@ WITH i, event
 WHERE event.event IS NOT NULL
 MERGE (te:TimelineEvent {incidentId: i.incidentId, event: event.event, timestamp: event.timestamp})
 SET te.source = event.source,
-    te.action = event.action
+    te.action = event.action,
+    te.order = event.order
 MERGE (i)-[:HAS_TIMELINE_EVENT]->(te);
 
 // Enrichment + team ownership (icm.json) with nested hierarchies

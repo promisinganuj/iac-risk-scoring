@@ -380,11 +380,15 @@ SET o.type = output.type,
 MERGE (t)-[:HAS_OUTPUT]->(o);
 
 // Link templates to resource groups (best-effort)
+// Match existing ResourceGroups by name instead of creating UNKNOWN| duplicates
 CALL apoc.load.json('file:///data/template.json') YIELD value AS row
 WITH row
 WHERE row.templateName IS NOT NULL AND trim(row.templateName) <> '' AND row.resourceGroup IS NOT NULL AND trim(row.resourceGroup) <> ''
 MERGE (t:Template {templateName: trim(row.templateName), templateVersion: trim(coalesce(row.templateVersion,''))})
 WITH t, trim(row.resourceGroup) AS rgName
-MERGE (rg:ResourceGroup {key: 'UNKNOWN|' + rgName})
-SET rg.name = rgName
+// Find any existing ResourceGroup with matching name that has a subscription
+MATCH (rg:ResourceGroup)
+WHERE rg.name = rgName AND rg.subscriptionId IS NOT NULL
+WITH t, rg
+LIMIT 1
 MERGE (t)-[:TARGETS_RESOURCE_GROUP]->(rg);

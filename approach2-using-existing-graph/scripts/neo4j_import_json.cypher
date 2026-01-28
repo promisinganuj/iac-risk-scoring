@@ -182,6 +182,16 @@ SET rg.name = trim(row.resourceGroup),
 MERGE (d)-[:TARGETS_RESOURCE_GROUP]->(rg)
 MERGE (rg)-[:IN_SUBSCRIPTION]->(sub);
 
+// Link deployments to templates
+CALL apoc.load.json('file:///data/ev2_deployment.json') YIELD value AS row
+WITH row
+WHERE row.rolloutId IS NOT NULL AND row.templateName IS NOT NULL
+MERGE (d:Deployment {rolloutId: trim(row.rolloutId)})
+WITH d, row.templateName AS tname, row.templateVersion AS tversion
+WHERE tname IS NOT NULL AND trim(tname) <> '' AND tversion IS NOT NULL AND trim(tversion) <> ''
+MERGE (t:Template {templateName: trim(tname), templateVersion: trim(tversion)})
+MERGE (d)-[:USES_TEMPLATE]->(t);
+
 // Process nested deployment stages
 CALL apoc.load.json('file:///data/ev2_deployment.json') YIELD value AS row
 WITH row

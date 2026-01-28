@@ -91,7 +91,9 @@ CALL db.schema.visualization()
 
 ![neo4j-schema-validation](./images/neo4j-schema-validation.png)
 
-## 4) Minimal validation queries
+## 4) Data validation
+
+### Quick validation
 
 Validate the import completed successfully:
 
@@ -107,7 +109,7 @@ This script checks:
 **Expected node counts from sample data:**
 - Services: 12
 - Incidents: 12
-- Azure Resources: 12
+- Azure Resources: 25
 - Deployments: 12
 - Templates: 12
 - Subscriptions: 7
@@ -127,6 +129,45 @@ docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (i:Inci
 # Count resources
 docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (r:AzureResource) RETURN count(r) AS resources;"
 ```
+
+### Comprehensive validation
+
+Run automated data quality tests:
+
+```bash
+docker exec neo4j-risk cypher-shell -u neo4j -p "$NEO4J_PASSWORD" -f /var/lib/neo4j/import/scripts/validate_graph.cypher
+```
+
+This test suite validates:
+1. **Orphan Detection**: Incidents reference existing resources
+2. **Service-Resource Consistency**: Incident relationships match resource ownership
+3. **Deployment Stage Ordering**: All stages have valid order properties
+4. **Mitigation Step Ordering**: All steps have sequential numbering
+5. **Artifact Circular Dependencies**: No cycles in artifact dependencies
+6. **Template Circular Dependencies**: No cycles in template dependencies
+7. **Service Resource Coverage**: All services own at least one resource
+8. **Deployment Template Linkage**: All deployments link to templates
+9. **Resource Group Hierarchy**: All resource groups belong to subscriptions
+10. **Incident Coverage**: All incidents have mitigation steps or timeline events
+
+**Expected output**:
+```
+test                              | status | issueCount | description
+----------------------------------+--------+------------+-----------------------------------------------
+Orphan Detection                  | PASS   | 0          | Incidents should only reference existing...
+Service-Resource Consistency      | FAIL   | 12         | Incident AFFECTS_SERVICE should match...
+...
+=== VALIDATION SUMMARY ===        | FAIL   | 7/10       | Some validations failed - check results above
+```
+
+**Known gaps**: The validation currently shows 3 expected failures due to sample data limitations:
+- Service-Resource Consistency (12 failures) - Incidents reference resources but don't always AFFECTS_SERVICE the owning service
+- Resource Group Hierarchy (12 failures) - Resource groups don't have IN_SUBSCRIPTION relationships in sample data
+- Incident Coverage (2 failures) - Some incidents lack mitigation steps and timeline events
+
+These gaps are documented in [docs/HIERARCHY_VALIDATION_REPORT.md](docs/HIERARCHY_VALIDATION_REPORT.md).
+
+**If validation shows NEW failures**: Check the report for resolution steps or file a beads issue.
 
 ## 5) Starting Neo4j MCP server (VS Code)
 

@@ -211,3 +211,4 @@ __marimo__/
 
 # bv (beads viewer) local config and caches
 .bv/
+.beads/export-state/

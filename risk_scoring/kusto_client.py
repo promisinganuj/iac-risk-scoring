@@ -17,7 +17,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional
 
-from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
+from azure.identity import (
+    AzureCliCredential,
+    DefaultAzureCredential,
+    ManagedIdentityCredential,
+)
 from azure.kusto.data import KustoClient as _SdkKustoClient
 from azure.kusto.data import KustoConnectionStringBuilder
 from azure.kusto.data.exceptions import KustoServiceError
@@ -60,14 +64,15 @@ class KustoConfig:
     ---------------------
     KUSTO_CLUSTER_URL   – required, e.g. https://mycluster.region.kusto.windows.net
     KUSTO_DATABASE      – required, the default database for queries
-    KUSTO_AUTH_METHOD   – "default" (DefaultAzureCredential) or "mi" (ManagedIdentityCredential)
+    KUSTO_AUTH_METHOD   – "default" (DefaultAzureCredential), "az_cli" (AzureCliCredential),
+                         or "mi" (ManagedIdentityCredential)
     KUSTO_MI_CLIENT_ID  – client ID when using user-assigned managed identity
     KUSTO_TIMEOUT_SECS  – per-query timeout in seconds (default 30)
     """
 
     cluster_url: str
     database: str
-    auth_method: str = "default"  # "default" | "mi"
+    auth_method: str = "default"  # "default" | "az_cli" | "mi"
     mi_client_id: Optional[str] = None
     timeout_secs: float = 30.0
 
@@ -89,9 +94,9 @@ class KustoConfig:
         auth_method = (
             os.environ.get("KUSTO_AUTH_METHOD") or "default"
         ).strip().lower()
-        if auth_method not in ("default", "mi"):
+        if auth_method not in ("default", "az_cli", "mi"):
             raise KustoQueryError(
-                f"Invalid KUSTO_AUTH_METHOD: {auth_method!r}. Must be 'default' or 'mi'."
+                f"Invalid KUSTO_AUTH_METHOD: {auth_method!r}. Must be 'default', 'az_cli', or 'mi'."
             )
 
         mi_client_id = (os.environ.get("KUSTO_MI_CLIENT_ID") or "").strip() or None
@@ -131,6 +136,11 @@ def _build_connection_string(
                 client_id=config.mi_client_id,
             )
         return KustoConnectionStringBuilder.with_aad_managed_service_identity_authentication(
+            config.cluster_url,
+        )
+
+    if config.auth_method == "az_cli":
+        return KustoConnectionStringBuilder.with_az_cli_authentication(
             config.cluster_url,
         )
 

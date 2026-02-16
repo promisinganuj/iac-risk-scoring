@@ -63,6 +63,11 @@ class TestKustoConfigFromEnv:
         assert config.auth_method == "mi"
         assert config.mi_client_id == "11111111-2222-3333-4444-555555555555"
 
+    def test_az_cli_auth(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._set_env(monkeypatch, KUSTO_AUTH_METHOD="az_cli")
+        config = KustoConfig.from_env()
+        assert config.auth_method == "az_cli"
+
     def test_timeout_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._set_env(monkeypatch, KUSTO_TIMEOUT_SECS="60")
         config = KustoConfig.from_env()

@@ -254,7 +254,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
     "k7.service_tree_lookup": KqlQuerySpec(
         query_id="k7.service_tree_lookup",
         kql=(
-            "GetServicesByName(datatable(ServiceNames: string)[{serviceName}])\n"
+            "GetServicesByName(datatable(ServiceName: string)[{serviceName}])\n"
             "| project ServiceId, ServiceName, ShortName, ServiceLevel,\n"
             "          Organization, ServiceLifecycleStage, IsExternalFacing\n"
             "| take {take}"

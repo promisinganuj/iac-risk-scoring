@@ -31,6 +31,7 @@ class TestScoringDeterminism(unittest.TestCase):
                 "env.production",
                 "blast_radius.services",
                 "blast_radius.critical_services",
+                "blast_radius.subscriptions",
                 "history.outages_180d",
                 "ops.open_icms",
                 "ops.deployments_30d",
@@ -45,6 +46,7 @@ class TestScoringDeterminism(unittest.TestCase):
         )
 
         # New factors should be unknown since evidence not provided
+        self.assertIn("subscription_count", result.unknowns)
         self.assertIn("deployment_stage_failures", result.unknowns)
         self.assertIn("avg_mttm_minutes", result.unknowns)
         self.assertIn("max_dependency_depth", result.unknowns)

@@ -317,3 +317,32 @@ def get_kql_query(query_id: str) -> KqlQuerySpec:
     if query is None:
         raise UnknownQueryError(f"KQL query not allowlisted: {query_id}")
     return query
+
+
+# ---------------------------------------------------------------------------
+# Service Tree → Subscription mapping
+# ---------------------------------------------------------------------------
+
+_SERVICE_ID_PARAM = ParamSpec(
+    name="serviceId", kind="str", required=True, max_len=36
+)
+
+KQL_ALLOWLIST["k10.service_subscriptions"] = KqlQuerySpec(
+    query_id="k10.service_subscriptions",
+    kql=(
+        "let Services = datatable(ServiceId:string)[{serviceId}];\n"
+        "GetSubscriptionsAssociatedWith(Services)\n"
+        "| project SubscriptionId, SubscriptionName, ServiceId,\n"
+        "          ServiceName, Environment, Status\n"
+        "| take {take}"
+    ),
+    params=(_SERVICE_ID_PARAM,),
+    source="service_tree",
+    max_take=500,
+    default_take=200,
+    evidence_key="service_subscriptions",
+    description=(
+        "Get all Azure subscriptions associated with a service via "
+        "Service Tree GetSubscriptionsAssociatedWith()."
+    ),
+)

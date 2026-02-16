@@ -243,6 +243,44 @@ def score_change(
             )
         )
 
+    # Rule 3b: blast radius by subscription count.
+    subscription_count = _require_int(evidence, "subscription_count")
+    if subscription_count is None:
+        unknown("subscription_count")
+        factors.append(
+            ScoreFactor(
+                factor_id="blast_radius.subscriptions",
+                title="Blast radius (subscriptions)",
+                status="unknown",
+                points=0,
+                max_points=10,
+                reason="subscription_count is missing.",
+                evidence={"subscription_count": None},
+            )
+        )
+    else:
+        if subscription_count >= 10:
+            pts = 10
+        elif subscription_count >= 5:
+            pts = 7
+        elif subscription_count >= 2:
+            pts = 4
+        elif subscription_count == 1:
+            pts = 2
+        else:
+            pts = 0
+        factors.append(
+            ScoreFactor(
+                factor_id="blast_radius.subscriptions",
+                title="Blast radius (subscriptions)",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=10,
+                reason="More subscriptions under a service increases the blast radius.",
+                evidence={"subscription_count": subscription_count},
+            )
+        )
+
     # Rule 4: recent outages.
     outages_180d = _require_int(evidence, "historical_outages_180d")
     if outages_180d is None:

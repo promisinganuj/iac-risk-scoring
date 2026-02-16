@@ -1,4 +1,4 @@
-"""Kusto-backed evidence provider for IcM/Outage data.
+"""Kusto-backed evidence provider for IcM/Outage and Service Tree data.
 
 Populates scoring evidence keys by executing allowlisted KQL queries
 against the appropriate Kusto cluster (determined by each query's ``source``
@@ -38,6 +38,11 @@ class KustoEvidenceProvider:
     - avg_mttm_minutes
     - historical_outages_180d
     - related_incidents
+    - deployment_count_30d
+    - deployment_stage_failures
+    - service_tree_id  (ServiceId from Service Tree)
+    - service_subscriptions  (list of subscription dicts)
+    - subscription_count
     """
 
     def __init__(
@@ -54,7 +59,7 @@ class KustoEvidenceProvider:
     def name(self) -> str:
         return "kusto-icm"
 
-    # The KQL query IDs this provider is responsible for,
+    # The KQL query IDs this provider is responsible for (scalar queries),
     # mapped to the evidence key each populates.
     _QUERY_MAP = {
         "k1.open_icms": "open_icms",
@@ -72,11 +77,12 @@ class KustoEvidenceProvider:
         *,
         as_of: Optional[date] = None,
     ) -> ProviderResult:
-        """Populate IcM evidence keys by running allowlisted KQL queries.
+        """Populate evidence keys by running allowlisted KQL queries.
 
-        Requires ``service_name`` in the evidence dict (set by an earlier
-        provider, e.g. Neo4j graph expansion). If missing, all keys are
-        marked unknown.
+        Pipeline within this provider:
+        1. Run scalar IcM/SafeFly queries (require service_name)
+        2. Resolve ServiceId via k7 (requires service_name)
+        3. Get subscriptions via k10 (requires ServiceId from step 2)
         """
         queries: List[QueryRun] = []
         populated: List[str] = []
@@ -86,7 +92,12 @@ class KustoEvidenceProvider:
         service_name = evidence.get("service_name")
         if not service_name or not isinstance(service_name, str) or not service_name.strip():
             # No service context — mark all our keys as unknown.
-            for ek in self._QUERY_MAP.values():
+            all_keys = list(self._QUERY_MAP.values()) + [
+                "service_tree_id",
+                "service_subscriptions",
+                "subscription_count",
+            ]
+            for ek in all_keys:
                 evidence.setdefault(ek, None)
                 unknowns.append(ek)
             return ProviderResult(
@@ -96,10 +107,10 @@ class KustoEvidenceProvider:
                 unknown_keys=tuple(sorted(unknowns)),
             )
 
-        # Run each allowlisted KQL query.
+        # --- Phase 1: Scalar IcM / SafeFly queries ---
         for query_id, evidence_key in self._QUERY_MAP.items():
             try:
-                result_value, qr = self._run_query(query_id, service_name)
+                result_value, qr = self._run_scalar_query(query_id, service_name)
                 queries.append(qr)
 
                 if result_value is not None:
@@ -116,6 +127,16 @@ class KustoEvidenceProvider:
                 evidence.setdefault(evidence_key, None)
                 unknowns.append(evidence_key)
 
+        # --- Phase 2: Service Tree lookup (k7) → ServiceId ---
+        service_id = self._resolve_service_id(
+            service_name, evidence, queries, populated, unknowns
+        )
+
+        # --- Phase 3: Subscription mapping (k10) → subscription list ---
+        self._resolve_subscriptions(
+            service_id, evidence, queries, populated, unknowns
+        )
+
         return ProviderResult(
             provider_name=self.name,
             queries=tuple(queries),
@@ -123,7 +144,120 @@ class KustoEvidenceProvider:
             unknown_keys=tuple(sorted(unknowns)),
         )
 
-    def _run_query(
+    # ------------------------------------------------------------------
+    # Phase 2: Service Tree ID resolution
+    # ------------------------------------------------------------------
+
+    def _resolve_service_id(
+        self,
+        service_name: str,
+        evidence: Dict[str, Any],
+        queries: List[QueryRun],
+        populated: List[str],
+        unknowns: List[str],
+    ) -> Optional[str]:
+        """Run k7.service_tree_lookup to get the ServiceId for a service name."""
+        try:
+            spec = get_kql_query("k7.service_tree_lookup")
+            params = {"serviceName": service_name}
+            validated = validate_kql_params(spec, params)
+            kql = build_kql(spec, validated)
+            client = self._client_for(spec.source)
+            rows = client.execute(kql)
+
+            qr = QueryRun(
+                query_id="k7.service_tree_lookup",
+                params={"serviceName": service_name},
+                row_count=len(rows),
+                sample_rows=tuple(rows[:3]),
+            )
+            queries.append(qr)
+
+            if rows:
+                service_id = rows[0].get("ServiceId")
+                if service_id:
+                    evidence["service_tree_id"] = service_id
+                    populated.append("service_tree_id")
+                    return str(service_id)
+
+            evidence.setdefault("service_tree_id", None)
+            unknowns.append("service_tree_id")
+            return None
+
+        except (KustoQueryError, Exception) as exc:
+            logger.warning(
+                "k7.service_tree_lookup failed: %s", exc, exc_info=True
+            )
+            evidence.setdefault("service_tree_id", None)
+            unknowns.append("service_tree_id")
+            return None
+
+    # ------------------------------------------------------------------
+    # Phase 3: Subscription mapping
+    # ------------------------------------------------------------------
+
+    def _resolve_subscriptions(
+        self,
+        service_id: Optional[str],
+        evidence: Dict[str, Any],
+        queries: List[QueryRun],
+        populated: List[str],
+        unknowns: List[str],
+    ) -> None:
+        """Run k10.service_subscriptions to get subscriptions for a service."""
+        if not service_id:
+            evidence.setdefault("service_subscriptions", None)
+            evidence.setdefault("subscription_count", None)
+            unknowns.extend(["service_subscriptions", "subscription_count"])
+            return
+
+        try:
+            spec = get_kql_query("k10.service_subscriptions")
+            params = {"serviceId": service_id}
+            validated = validate_kql_params(spec, params)
+            kql = build_kql(spec, validated)
+            client = self._client_for(spec.source)
+            rows = client.execute(kql)
+
+            qr = QueryRun(
+                query_id="k10.service_subscriptions",
+                params={"serviceId": service_id},
+                row_count=len(rows),
+                sample_rows=tuple(rows[:5]),
+            )
+            queries.append(qr)
+
+            if rows:
+                subscriptions = [
+                    {
+                        "subscription_id": r.get("SubscriptionId", ""),
+                        "subscription_name": r.get("SubscriptionName", ""),
+                        "environment": r.get("Environment", ""),
+                        "status": r.get("Status"),
+                    }
+                    for r in rows
+                ]
+                evidence["service_subscriptions"] = subscriptions
+                evidence["subscription_count"] = len(subscriptions)
+                populated.extend(["service_subscriptions", "subscription_count"])
+            else:
+                evidence["service_subscriptions"] = []
+                evidence["subscription_count"] = 0
+                populated.extend(["service_subscriptions", "subscription_count"])
+
+        except (KustoQueryError, Exception) as exc:
+            logger.warning(
+                "k10.service_subscriptions failed: %s", exc, exc_info=True
+            )
+            evidence.setdefault("service_subscriptions", None)
+            evidence.setdefault("subscription_count", None)
+            unknowns.extend(["service_subscriptions", "subscription_count"])
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _run_scalar_query(
         self, query_id: str, service_name: str
     ) -> tuple[Optional[int], QueryRun]:
         """Run a single KQL query and extract the scalar result."""
@@ -132,7 +266,6 @@ class KustoEvidenceProvider:
         validated = validate_kql_params(spec, params)
         kql = build_kql(spec, validated)
 
-        # Resolve the correct client for this query's source.
         client = self._client_for(spec.source)
         rows = client.execute(kql)
 
@@ -143,10 +276,9 @@ class KustoEvidenceProvider:
             sample_rows=tuple(rows[:5]),
         )
 
-        # All our current queries return a single summarize row with one column.
+        # All scalar queries return a single summarize row with one column.
         if rows and len(rows) > 0:
             row = rows[0]
-            # The evidence_key in the KQL query is used as the column name.
             value = row.get(spec.evidence_key)
             if value is not None:
                 try:
@@ -156,13 +288,8 @@ class KustoEvidenceProvider:
         return None, qr
 
     def _client_for(self, source: str) -> KustoClient:
-        """Return the KustoClient for the given logical source name.
-
-        When constructed with a registry, looks up the source; when
-        constructed with a plain client, always returns that client.
-        """
+        """Return the KustoClient for the given logical source name."""
         if self._registry is not None:
             return self._registry.get_client(source)
-        # Fallback: single-client mode (backward compat / tests).
         assert self._client is not None
         return self._client

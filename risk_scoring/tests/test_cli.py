@@ -106,15 +106,10 @@ class TestDataSourceDetection(unittest.TestCase):
     def test_kusto_available_with_env(self):
         self.assertTrue(_kusto_available())
 
-    def test_kusto_available_with_yaml(self):
-        """YAML file ships with the package, so should always be found."""
-        from pathlib import Path
-
-        yaml_path = Path(__file__).resolve().parent.parent / "config" / "kusto_sources.yaml"
-        if yaml_path.exists():
-            # Clear env to ensure detection is via YAML
-            with patch.dict(os.environ, {}, clear=True):
-                self.assertTrue(_kusto_available())
+    @patch.dict(os.environ, {}, clear=True)
+    def test_kusto_not_available_without_env(self):
+        """YAML alone is not enough — KUSTO_AUTH_METHOD must be set."""
+        self.assertFalse(_kusto_available())
 
     def test_resolve_explicit_source(self):
         for ds in ("kusto", "neo4j", "hybrid"):

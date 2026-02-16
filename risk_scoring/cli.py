@@ -137,13 +137,13 @@ def _neo4j_available() -> bool:
 
 
 def _kusto_available() -> bool:
-    """Return True if Kusto can be used (YAML exists or env var set)."""
-    if os.environ.get("KUSTO_AUTH_METHOD"):
-        return True
-    # Check for bundled YAML
-    from pathlib import Path
-    yaml_path = Path(__file__).resolve().parent / "config" / "kusto_sources.yaml"
-    return yaml_path.exists()
+    """Return True if Kusto can be used.
+
+    Requires KUSTO_AUTH_METHOD to be explicitly set — the bundled YAML
+    config file alone is not sufficient since the user may not have
+    credentials configured.
+    """
+    return bool(os.environ.get("KUSTO_AUTH_METHOD"))
 
 
 def _resolve_data_source(requested: str) -> str:

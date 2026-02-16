@@ -54,22 +54,22 @@ python -m risk_scoring [identity flags] --environment <env> [options]
 
 ```bash
 # Neo4j-only (legacy)
-python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod
+python -m risk_scoring --resource-id "res-alpha-app" --environment prod
 
 # Kusto-only (no Neo4j required)
 python -m risk_scoring --service-name "Azure Database for PostgreSQL - Flexible Server" \
     --environment prod --data-source kusto
 
 # Hybrid: Neo4j + Kusto
-python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod \
+python -m risk_scoring --resource-id "res-alpha-app" --environment prod \
     --data-source hybrid
 
 # JSON output to file
-python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod \
+python -m risk_scoring --resource-id "res-alpha-app" --environment prod \
     --output-format json --output-file report.json
 
 # Verbose logging
-python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod --verbose
+python -m risk_scoring --resource-id "res-alpha-app" --environment prod --verbose
 ```
 
 ### Environment variables

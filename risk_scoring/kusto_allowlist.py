@@ -65,8 +65,15 @@ class KqlQuerySpec:
 # Validation & KQL building
 # ---------------------------------------------------------------------------
 
-# Characters we allow inside interpolated string values (GUID hex + hyphens).
-_SAFE_STRING_RE = re.compile(r"^[A-Fa-f0-9\-]+$")
+# Characters we allow inside interpolated string values.
+# GUID pattern (hex + hyphens) — used for Service Tree ServiceId, etc.
+_SAFE_GUID_RE = re.compile(r"^[A-Fa-f0-9\-]+$")
+
+# Service-name pattern — letters, digits, spaces, hyphens, underscores,
+# parentheses, periods, commas, ampersands, forward-slashes.
+# Deliberately excludes quotes, backslashes, semicolons, pipes, and braces
+# to prevent KQL injection.
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9 \-_().,&/+:@#]+$")
 
 
 def validate_kql_params(
@@ -114,7 +121,9 @@ def build_kql(query: KqlQuerySpec, validated_params: Dict[str, Any]) -> str:
             continue
         if spec.kind == "str":
             sval = str(val)
-            if not _SAFE_STRING_RE.match(sval):
+            # Choose the appropriate safe-character regex based on context.
+            safe_re = _SAFE_GUID_RE if spec.max_len <= 36 else _SAFE_NAME_RE
+            if not safe_re.match(sval):
                 raise ParameterValidationError(
                     f"Param {spec.name} contains unsafe characters for KQL interpolation"
                 )
@@ -139,6 +148,7 @@ def build_kql(query: KqlQuerySpec, validated_params: Dict[str, Any]) -> str:
 # IcM cluster / database constants
 # ---------------------------------------------------------------------------
 
+# -- IcM cluster --
 _ICM_CLUSTER = "icmcluster.kusto.windows.net"
 _ICM_DATABASE = "IcMDataWarehouse"
 _ICM_TABLE = "IncidentsSnapshotV2"
@@ -148,14 +158,19 @@ _ICM_FQ_TABLE = (
     f"cluster('{_ICM_CLUSTER}').database('{_ICM_DATABASE}').{_ICM_TABLE}"
 )
 
+# -- Service Tree cluster --
+_ST_CLUSTER = "servicetreepublic.westus.kusto.windows.net"
+_ST_DATABASE = "Shared"
+
 
 # ---------------------------------------------------------------------------
 # Allowlisted KQL queries — IcM / Outage
 # ---------------------------------------------------------------------------
 
-# Common param: serviceId is a GUID matching OwningTenantPublicId in IcM.
-_SERVICE_ID_PARAM = ParamSpec(
-    name="serviceId", kind="str", required=True, max_len=36
+# Common param: serviceName is the OwningTenantName string in IcM,
+# which matches ServiceName in Service Tree.
+_SERVICE_NAME_PARAM = ParamSpec(
+    name="serviceName", kind="str", required=True, max_len=256
 )
 
 
@@ -166,12 +181,12 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
         query_id="k1.open_icms",
         kql=(
             f"{_ICM_FQ_TABLE}\n"
-            "| where OwningTenantPublicId == toguid({serviceId})\n"
+            "| where OwningTenantName == {serviceName}\n"
             "| where isempty(ResolveDate)\n"
             "| summarize open_icms = count()\n"
             "| take {take}"
         ),
-        params=(_SERVICE_ID_PARAM,),
+        params=(_SERVICE_NAME_PARAM,),
         max_take=1,
         default_take=1,
         evidence_key="open_icms",
@@ -183,7 +198,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
         query_id="k4.avg_mttm",
         kql=(
             f"{_ICM_FQ_TABLE}\n"
-            "| where OwningTenantPublicId == toguid({serviceId})\n"
+            "| where OwningTenantName == {serviceName}\n"
             "| where isnotempty(ImpactStartDate) and isnotempty(MitigateDate)\n"
             "| where ImpactStartDate > ago(180d)\n"
             "| extend mttm_minutes = datetime_diff('minute', MitigateDate, ImpactStartDate)\n"
@@ -191,7 +206,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
             "| summarize avg_mttm_minutes = toint(avg(mttm_minutes))\n"
             "| take {take}"
         ),
-        params=(_SERVICE_ID_PARAM,),
+        params=(_SERVICE_NAME_PARAM,),
         max_take=1,
         default_take=1,
         evidence_key="avg_mttm_minutes",
@@ -203,13 +218,13 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
         query_id="k5.outages_180d",
         kql=(
             f"{_ICM_FQ_TABLE}\n"
-            "| where OwningTenantPublicId == toguid({serviceId})\n"
+            "| where OwningTenantName == {serviceName}\n"
             "| where IsOutage == true\n"
             "| where CreateDate > ago(180d)\n"
             "| summarize historical_outages_180d = count()\n"
             "| take {take}"
         ),
-        params=(_SERVICE_ID_PARAM,),
+        params=(_SERVICE_NAME_PARAM,),
         max_take=1,
         default_take=1,
         evidence_key="historical_outages_180d",
@@ -221,18 +236,34 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
         query_id="k6.related_incidents",
         kql=(
             f"let service_incidents = {_ICM_FQ_TABLE}\n"
-            "    | where OwningTenantPublicId == toguid({serviceId})\n"
+            "    | where OwningTenantName == {serviceName}\n"
             "    | where CreateDate > ago(90d)\n"
             "    | where isnotempty(ParentIncidentId) and ParentIncidentId > 0\n"
             "    | summarize related_incidents = dcount(ParentIncidentId);\n"
             "service_incidents\n"
             "| take {take}"
         ),
-        params=(_SERVICE_ID_PARAM,),
+        params=(_SERVICE_NAME_PARAM,),
         max_take=1,
         default_take=1,
         evidence_key="related_incidents",
         description="Count of distinct parent-linked incident clusters in the last 90 days.",
+    ),
+
+    # k7 — Resolve ServiceName → ServiceId via Service Tree
+    "k7.service_tree_lookup": KqlQuerySpec(
+        query_id="k7.service_tree_lookup",
+        kql=(
+            "GetServicesByName(datatable(ServiceNames: string)[{serviceName}])\n"
+            "| project ServiceId, ServiceName, ShortName, ServiceLevel,\n"
+            "          Organization, ServiceLifecycleStage, IsExternalFacing\n"
+            "| take {take}"
+        ),
+        params=(_SERVICE_NAME_PARAM,),
+        max_take=10,
+        default_take=1,
+        evidence_key="service_tree_id",
+        description="Resolve a service name to its Service Tree ServiceId and metadata.",
     ),
 }
 

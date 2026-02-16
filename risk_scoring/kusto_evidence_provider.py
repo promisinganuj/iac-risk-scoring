@@ -60,17 +60,17 @@ class KustoEvidenceProvider:
     ) -> ProviderResult:
         """Populate IcM evidence keys by running allowlisted KQL queries.
 
-        Requires ``service_id`` in the evidence dict (set by an earlier
-        provider or from entity resolution). If missing, all keys are
+        Requires ``service_name`` in the evidence dict (set by an earlier
+        provider, e.g. Neo4j graph expansion). If missing, all keys are
         marked unknown.
         """
         queries: List[QueryRun] = []
         populated: List[str] = []
         unknowns: List[str] = []
 
-        # We need a service ID (GUID) to query IcM.
-        service_id = evidence.get("service_id")
-        if not service_id or not isinstance(service_id, str) or not service_id.strip():
+        # We need a service name to query IcM (matches OwningTenantName).
+        service_name = evidence.get("service_name")
+        if not service_name or not isinstance(service_name, str) or not service_name.strip():
             # No service context — mark all our keys as unknown.
             for ek in self._QUERY_MAP.values():
                 evidence.setdefault(ek, None)
@@ -85,7 +85,7 @@ class KustoEvidenceProvider:
         # Run each allowlisted KQL query.
         for query_id, evidence_key in self._QUERY_MAP.items():
             try:
-                result_value, qr = self._run_query(query_id, service_id)
+                result_value, qr = self._run_query(query_id, service_name)
                 queries.append(qr)
 
                 if result_value is not None:
@@ -110,11 +110,11 @@ class KustoEvidenceProvider:
         )
 
     def _run_query(
-        self, query_id: str, service_id: str
+        self, query_id: str, service_name: str
     ) -> tuple[Optional[int], QueryRun]:
         """Run a single KQL query and extract the scalar result."""
         spec = get_kql_query(query_id)
-        params = {"serviceId": service_id}
+        params = {"serviceName": service_name}
         validated = validate_kql_params(spec, params)
         kql = build_kql(spec, validated)
 
@@ -122,7 +122,7 @@ class KustoEvidenceProvider:
 
         qr = QueryRun(
             query_id=query_id,
-            params={"serviceId": service_id},
+            params={"serviceName": service_name},
             row_count=len(rows),
             sample_rows=tuple(rows[:5]),
         )

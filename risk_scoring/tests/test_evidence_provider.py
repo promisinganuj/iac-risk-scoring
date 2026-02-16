@@ -6,7 +6,7 @@ Covers:
 - KustoEvidenceProvider with mocked KustoClient
 - Neo4jEvidenceProvider with mocked EvidenceClient
 - Error isolation between providers
-- Provider ordering (Neo4j first sets service_id for Kusto)
+- Provider ordering (Neo4j first sets service_name for Kusto)
 """
 
 from __future__ import annotations
@@ -221,7 +221,7 @@ class TestKustoEvidenceProvider:
             "related_incidents": [{"related_incidents": 1}],
         })
         provider = KustoEvidenceProvider(client)
-        evidence: Dict[str, Any] = {"service_id": "A56C6700-6666-4444-AAAA-000F3B9CC999"}
+        evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
         assert evidence["open_icms"] == 3
@@ -231,7 +231,7 @@ class TestKustoEvidenceProvider:
         assert result.unknown_keys == ()
         assert len(result.populated_keys) == 4
 
-    def test_no_service_id_marks_all_unknown(self) -> None:
+    def test_no_service_name_marks_all_unknown(self) -> None:
         client = MagicMock()
         provider = KustoEvidenceProvider(client)
         evidence: Dict[str, Any] = {}
@@ -257,7 +257,7 @@ class TestKustoEvidenceProvider:
 
         client.execute.side_effect = side_effect
         provider = KustoEvidenceProvider(client)
-        evidence: Dict[str, Any] = {"service_id": "A56C6700-6666-4444-AAAA-000F3B9CC999"}
+        evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
         # First query failed, but others should still run.
@@ -268,7 +268,7 @@ class TestKustoEvidenceProvider:
         client = MagicMock()
         client.execute.return_value = []
         provider = KustoEvidenceProvider(client)
-        evidence: Dict[str, Any] = {"service_id": "A56C6700-6666-4444-AAAA-000F3B9CC999"}
+        evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
         assert len(result.unknown_keys) == 4
@@ -282,7 +282,7 @@ class TestKustoEvidenceProvider:
         client = MagicMock()
         client.execute.return_value = [{"open_icms": 5}]
         provider = KustoEvidenceProvider(client)
-        evidence: Dict[str, Any] = {"service_id": "A56C6700-6666-4444-AAAA-000F3B9CC999"}
+        evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
         assert len(result.queries) == 4
@@ -350,11 +350,15 @@ class TestNeo4jEvidenceProvider:
 class TestProviderOrdering:
     """Test that Neo4j-first, Kusto-second ordering works correctly."""
 
-    def test_neo4j_sets_service_id_for_kusto(self) -> None:
-        """When Neo4j runs first and sets service_id, Kusto can use it."""
+    def test_neo4j_sets_service_name_for_kusto(self) -> None:
+        """When Neo4j runs first and sets service_name, Kusto can use it."""
         neo4j_provider = StubProvider(
             "neo4j",
-            {"service_id": "A56C6700-6666-4444-AAAA-000F3B9CC999", "services_impacted": 1},
+            {
+                "service_id": "A56C6700-6666-4444-AAAA-000F3B9CC999",
+                "service_name": "Azure App Service (Payments)",
+                "services_impacted": 1,
+            },
         )
         kusto_provider = StubProvider(
             "kusto",
@@ -364,15 +368,15 @@ class TestProviderOrdering:
             [neo4j_provider, kusto_provider],
             _resolved(),
         )
-        assert result.evidence["service_id"] == "A56C6700-6666-4444-AAAA-000F3B9CC999"
+        assert result.evidence["service_name"] == "Azure App Service (Payments)"
         assert result.evidence["open_icms"] == 5
 
     def test_kusto_without_neo4j_no_crash(self) -> None:
-        """When Kusto runs alone without service_id, it degrades gracefully."""
+        """When Kusto runs alone without service_name, it degrades gracefully."""
         client = MagicMock()
         provider = KustoEvidenceProvider(client)
         result = run_providers([provider], _resolved())
 
-        # All keys should be unknown since there's no service_id.
+        # All keys should be unknown since there's no service_name.
         assert len(result.unknowns) == 4
         client.execute.assert_not_called()

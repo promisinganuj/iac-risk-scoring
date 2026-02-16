@@ -14,8 +14,8 @@ from risk_scoring.kusto_allowlist import (
 )
 
 
-# A valid Service Tree GUID for testing.
-_VALID_SERVICE_ID = "A56C6700-6666-4444-AAAA-000F3B9CC999"
+# A valid service name for testing (matches IcM OwningTenantName).
+_VALID_SERVICE_NAME = "Azure App Service (Payments)"
 
 
 # ============================================================
@@ -45,63 +45,63 @@ class TestGetKqlQuery:
 
 
 class TestValidateKqlParams:
-    def test_valid_service_id(self) -> None:
+    def test_valid_service_name(self) -> None:
         q = get_kql_query("k1.open_icms")
-        result = validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID})
-        assert result["serviceId"] == _VALID_SERVICE_ID
+        result = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
+        assert result["serviceName"] == _VALID_SERVICE_NAME
         assert result["take"] == q.default_take
 
-    def test_missing_required_service_id(self) -> None:
+    def test_missing_required_service_name(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="Missing required"):
             validate_kql_params(q, {})
 
-    def test_empty_service_id(self) -> None:
+    def test_empty_service_name(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="non-empty"):
-            validate_kql_params(q, {"serviceId": ""})
+            validate_kql_params(q, {"serviceName": ""})
 
-    def test_service_id_too_long(self) -> None:
+    def test_service_name_too_long(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="max_len"):
-            validate_kql_params(q, {"serviceId": "a" * 37})
+            validate_kql_params(q, {"serviceName": "a" * 257})
 
-    def test_service_id_must_be_string(self) -> None:
+    def test_service_name_must_be_string(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="must be a string"):
-            validate_kql_params(q, {"serviceId": 12345})
+            validate_kql_params(q, {"serviceName": 12345})
 
 
 class TestTakeValidation:
     def test_default_take(self) -> None:
         q = get_kql_query("k1.open_icms")
-        result = validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID})
+        result = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         assert result["take"] == 1  # k1 default_take=1
 
     def test_explicit_take(self) -> None:
         q = get_kql_query("k1.open_icms")
-        result = validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID, "take": 1})
+        result = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": 1})
         assert result["take"] == 1
 
     def test_take_exceeds_max(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="max_take"):
-            validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID, "take": 100})
+            validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": 100})
 
     def test_take_zero(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="must be > 0"):
-            validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID, "take": 0})
+            validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": 0})
 
     def test_take_negative(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="must be > 0"):
-            validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID, "take": -1})
+            validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": -1})
 
     def test_take_not_int(self) -> None:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="must be an int"):
-            validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID, "take": "5"})
+            validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": "5"})
 
 
 # ============================================================
@@ -112,17 +112,17 @@ class TestTakeValidation:
 class TestBuildKql:
     def test_k1_open_icms(self) -> None:
         q = get_kql_query("k1.open_icms")
-        params = validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID})
+        params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         kql = build_kql(q, params)
-        # Should contain the GUID single-quoted
-        assert f"toguid('{_VALID_SERVICE_ID}')" in kql
+        # Should contain the service name single-quoted
+        assert f"OwningTenantName == '{_VALID_SERVICE_NAME}'" in kql
         assert "isempty(ResolveDate)" in kql
         assert "open_icms = count()" in kql
         assert "take 1" in kql
 
     def test_k4_avg_mttm(self) -> None:
         q = get_kql_query("k4.avg_mttm")
-        params = validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID})
+        params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         kql = build_kql(q, params)
         assert "avg_mttm_minutes" in kql
         assert "datetime_diff" in kql
@@ -132,7 +132,7 @@ class TestBuildKql:
 
     def test_k5_outages_180d(self) -> None:
         q = get_kql_query("k5.outages_180d")
-        params = validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID})
+        params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         kql = build_kql(q, params)
         assert "IsOutage == true" in kql
         assert "ago(180d)" in kql
@@ -140,36 +140,55 @@ class TestBuildKql:
 
     def test_k6_related_incidents(self) -> None:
         q = get_kql_query("k6.related_incidents")
-        params = validate_kql_params(q, {"serviceId": _VALID_SERVICE_ID})
+        params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         kql = build_kql(q, params)
         assert "ParentIncidentId" in kql
         assert "dcount" in kql
         assert "ago(90d)" in kql
 
+    def test_k7_service_tree_lookup(self) -> None:
+        q = get_kql_query("k7.service_tree_lookup")
+        params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
+        kql = build_kql(q, params)
+        assert "GetServicesByName" in kql
+        assert f"'{_VALID_SERVICE_NAME}'" in kql
+        assert "ServiceId" in kql
+
     def test_unsafe_characters_rejected(self) -> None:
         q = get_kql_query("k1.open_icms")
-        # Inject a serviceId with KQL injection attempt
-        params = {"serviceId": "abc'); .drop table X; //", "take": 1}
-        # First validate (will strip/pass since it looks like a string)
-        # but build_kql should reject unsafe chars
+        # Inject a serviceName with KQL injection attempt
+        params = {"serviceName": "abc'); .drop table X; //", "take": 1}
         with pytest.raises(ParameterValidationError):
             validated = validate_kql_params(q, params)
             build_kql(q, validated)
 
-    def test_sql_injection_in_guid(self) -> None:
+    def test_quote_injection_rejected(self) -> None:
         q = get_kql_query("k1.open_icms")
-        # Semicolons are not in SAFE_STRING_RE
-        params = {"serviceId": "A56C6700;drop", "take": 1}
+        # Double-quote in name should be rejected
+        params = {"serviceName": 'My Service" | drop', "take": 1}
         with pytest.raises(ParameterValidationError):
             validated = validate_kql_params(q, params)
             build_kql(q, validated)
 
-    def test_valid_lowercase_guid(self) -> None:
+    def test_semicolon_injection_rejected(self) -> None:
         q = get_kql_query("k1.open_icms")
-        lower_guid = "a56c6700-6666-4444-aaaa-000f3b9cc999"
-        params = validate_kql_params(q, {"serviceId": lower_guid})
+        params = {"serviceName": "Service; .drop table X", "take": 1}
+        with pytest.raises(ParameterValidationError):
+            validated = validate_kql_params(q, params)
+            build_kql(q, validated)
+
+    def test_valid_service_name_with_special_chars(self) -> None:
+        """Service names like 'Azure App Service (Payments)' should pass."""
+        q = get_kql_query("k1.open_icms")
+        params = validate_kql_params(q, {"serviceName": "Azure App Service (Payments)"})
         kql = build_kql(q, params)
-        assert f"toguid('{lower_guid}')" in kql
+        assert "OwningTenantName == 'Azure App Service (Payments)'" in kql
+
+    def test_valid_service_name_with_ampersand(self) -> None:
+        q = get_kql_query("k1.open_icms")
+        params = validate_kql_params(q, {"serviceName": "R&D Platform"})
+        kql = build_kql(q, params)
+        assert "'R&D Platform'" in kql
 
 
 # ============================================================
@@ -188,8 +207,10 @@ class TestQuerySpecInvariants:
         for qid, q in KQL_ALLOWLIST.items():
             assert q.evidence_key, f"{qid} is missing evidence_key"
 
-    def test_all_queries_reference_icm_table(self) -> None:
+    def test_all_icm_queries_reference_icm_table(self) -> None:
         for qid, q in KQL_ALLOWLIST.items():
+            if qid.startswith("k7."):  # Service Tree queries don't use IcM table
+                continue
             assert "IncidentsSnapshotV2" in q.kql, f"{qid} should reference IcM table"
 
     def test_default_take_within_max(self) -> None:

@@ -31,5 +31,8 @@
       }
     ]
   },
-  "chat.mcp.gallery.enabled": true
+  "chat.mcp.gallery.enabled": true,
+  "chat.tools.terminal.autoApprove": {
+    "wslpath": true
+  }
 }

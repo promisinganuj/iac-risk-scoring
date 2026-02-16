@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
+from risk_scoring.evidence_provider import EvidenceExpansionResult
 from risk_scoring.graph_expansion import GraphExpansionResult, QueryRun
 from risk_scoring.models import ResolvedEntityRef
 from risk_scoring.scoring import ChangeContext, ScoreResult
@@ -20,7 +21,7 @@ def build_report_json(
     *,
     resolved: ResolvedEntityRef,
     change: ChangeContext,
-    expansion: GraphExpansionResult,
+    expansion: Union[GraphExpansionResult, EvidenceExpansionResult],
     score: ScoreResult,
     report_id: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -33,8 +34,11 @@ def build_report_json(
 
     unknowns = _sorted_unique(list(expansion.unknowns) + list(score.unknowns))
 
+    # EvidenceExpansionResult uses 'all_queries'; GraphExpansionResult uses 'queries'.
+    queries = getattr(expansion, "all_queries", None) or getattr(expansion, "queries", ())
+
     evidence_queries: List[Dict[str, Any]] = []
-    for q in expansion.queries:
+    for q in queries:
         evidence_queries.append(
             {
                 "query_id": q.query_id,

@@ -11,12 +11,20 @@
     },
     "neo4j-database": {
       "command": "/home/anuj/.local/bin/uvx",
-      "args": ["--native-tls", "mcp-neo4j-cypher@0.5.2", "--transport", "stdio"],
+      "args": [
+        "--native-tls",
+        "mcp-neo4j-cypher@0.5.2",
+        "--transport",
+        "stdio"
+      ],
       "envFile": "/home/anuj/github/iac-risk-scoring/.env"
     },
     "risk-scoring": {
       "command": "/home/anuj/github/iac-risk-scoring/.venv/bin/python3",
-      "args": ["-m", "risk_scoring.mcp_server"],
+      "args": [
+        "-m",
+        "risk_scoring.mcp_server"
+      ],
       "cwd": "/home/anuj/github/iac-risk-scoring",
       "envFile": "/home/anuj/github/iac-risk-scoring/.env"
     }

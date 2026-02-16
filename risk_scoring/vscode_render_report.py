@@ -6,13 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-# Make sure `approach2-using-existing-graph` is importable when executed as a script.
-THIS_FILE = Path(__file__).resolve()
-APPROACH2_DIR = THIS_FILE.parents[1]
-if str(APPROACH2_DIR) not in sys.path:
-    sys.path.insert(0, str(APPROACH2_DIR))
-
-from risk_scoring.reporting import render_markdown_report  # noqa: E402
+from risk_scoring.reporting import render_markdown_report
 
 
 def _read_json(path: Optional[str]) -> Dict[str, Any]:

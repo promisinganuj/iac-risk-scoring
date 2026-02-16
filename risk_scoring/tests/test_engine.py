@@ -1,18 +1,11 @@
-import sys
 import unittest
 from datetime import date
-from pathlib import Path
 
-# Ensure approach2-using-existing-graph is on sys.path so we can import risk_scoring.
-THIS_DIR = Path(__file__).resolve().parent
-APPROACH2_DIR = THIS_DIR.parent.parent
-sys.path.insert(0, str(APPROACH2_DIR))
-
-from risk_scoring.engine import assess_resource_change  # noqa: E402
-from risk_scoring.evidence_client import CypherExecutor, EvidenceClient  # noqa: E402
-from risk_scoring.models import CandidateEntity, ResourceSpec  # noqa: E402
-from risk_scoring.repository import InMemoryRepository  # noqa: E402
-from risk_scoring.scoring import ChangeContext  # noqa: E402
+from risk_scoring.engine import assess_resource_change
+from risk_scoring.evidence_client import CypherExecutor, EvidenceClient
+from risk_scoring.models import CandidateEntity, ResourceSpec
+from risk_scoring.repository import InMemoryRepository
+from risk_scoring.scoring import ChangeContext
 
 
 class FakeExecutor(CypherExecutor):

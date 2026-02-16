@@ -6,12 +6,6 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Make sure `approach2-using-existing-graph` is importable when executed as a script.
-THIS_FILE = Path(__file__).resolve()
-APPROACH2_DIR = THIS_FILE.parents[1]
-if str(APPROACH2_DIR) not in sys.path:
-    sys.path.insert(0, str(APPROACH2_DIR))
-
 from risk_scoring.engine import assess_resource_change
 from risk_scoring.evidence_client import EvidenceClient
 from risk_scoring.neo4j_http import Neo4jHttpConfig

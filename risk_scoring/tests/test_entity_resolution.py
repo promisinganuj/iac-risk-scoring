@@ -1,26 +1,23 @@
 import json
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-# Ensure approach2-using-existing-graph is on sys.path so we can import risk_scoring.
-THIS_DIR = Path(__file__).resolve().parent
-APPROACH2_DIR = THIS_DIR.parent.parent
-sys.path.insert(0, str(APPROACH2_DIR))
+from risk_scoring.csv_repository import CsvEntityRepository
+from risk_scoring.entity_resolution import resolve_azure_resource
+from risk_scoring.errors import AmbiguousMatchError, NotFoundError
+from risk_scoring.models import CandidateEntity, ResourceSpec
+from risk_scoring.repository import InMemoryRepository
 
-from risk_scoring.csv_repository import CsvEntityRepository  # noqa: E402
-from risk_scoring.entity_resolution import resolve_azure_resource  # noqa: E402
-from risk_scoring.errors import AmbiguousMatchError, NotFoundError  # noqa: E402
-from risk_scoring.models import CandidateEntity, ResourceSpec  # noqa: E402
-from risk_scoring.repository import InMemoryRepository  # noqa: E402
+# Sample data lives under approach2-using-existing-graph/
+_SAMPLE_DATA_DIR = Path(__file__).resolve().parents[2] / "approach2-using-existing-graph" / "sample-data"
 
 
 class TestEntityResolutionCsv(unittest.TestCase):
     def test_resolves_by_resource_id_from_sample_data(self) -> None:
         repo = CsvEntityRepository(
-            sample_data_dir=Path(__file__).resolve().parents[2] / "sample-data"
+            sample_data_dir=_SAMPLE_DATA_DIR
         )
         ref = resolve_azure_resource(
             repo,
@@ -33,10 +30,10 @@ class TestEntityResolutionCsv(unittest.TestCase):
     def test_loads_from_json_by_default(self) -> None:
         """Verify CsvEntityRepository loads from JSON files by default."""
         repo = CsvEntityRepository(
-            sample_data_dir=Path(__file__).resolve().parents[2] / "sample-data"
+            sample_data_dir=_SAMPLE_DATA_DIR
         )
         # JSON file should exist and be loaded
-        json_path = Path(__file__).resolve().parents[2] / "sample-data" / "azure_resources.json"
+        json_path = _SAMPLE_DATA_DIR / "azure_resources.json"
         self.assertTrue(json_path.exists(), "JSON file should exist")
         
         # Verify data was loaded (should have 12 resources from JSON)

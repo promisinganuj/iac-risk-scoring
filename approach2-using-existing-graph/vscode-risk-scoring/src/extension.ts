@@ -169,7 +169,7 @@ async function pickEnvironment(): Promise<string | undefined> {
 
 async function runCanonicalization(workspaceRoot: string, baseRef: string, paths: string[], environment?: string): Promise<string> {
   const python = findPython(workspaceRoot);
-  const entrypoint = path.join(workspaceRoot, 'approach2-using-existing-graph', 'risk_scoring', 'vscode_entrypoint.py');
+  const entrypoint = path.join(workspaceRoot, 'risk_scoring', 'vscode_entrypoint.py');
 
   const args: string[] = [entrypoint, '--repo-dir', workspaceRoot, '--base-ref', baseRef];
   for (const p of paths) {
@@ -202,7 +202,7 @@ async function runCanonicalization(workspaceRoot: string, baseRef: string, paths
 
 async function runMarkdownRender(workspaceRoot: string, reportJsonText: string): Promise<string> {
   const python = findPython(workspaceRoot);
-  const renderer = path.join(workspaceRoot, 'approach2-using-existing-graph', 'risk_scoring', 'vscode_render_report.py');
+  const renderer = path.join(workspaceRoot, 'risk_scoring', 'vscode_render_report.py');
 
   const args: string[] = [renderer, '--input', '-'];
 
@@ -236,7 +236,7 @@ async function runScoring(
   resourceTypeOverride?: string
 ): Promise<string> {
   const python = findPython(workspaceRoot);
-  const scorer = path.join(workspaceRoot, 'approach2-using-existing-graph', 'risk_scoring', 'vscode_score_entrypoint.py');
+  const scorer = path.join(workspaceRoot, 'risk_scoring', 'vscode_score_entrypoint.py');
 
   const args: string[] = [scorer, '--input', '-'];
   if (resourceIdOverride) {

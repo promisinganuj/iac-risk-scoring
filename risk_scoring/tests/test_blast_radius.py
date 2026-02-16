@@ -1,15 +1,8 @@
-import sys
 import unittest
-from pathlib import Path
 
-# Ensure approach2-using-existing-graph is on sys.path so we can import risk_scoring.
-THIS_DIR = Path(__file__).resolve().parent
-APPROACH2_DIR = THIS_DIR.parent.parent
-sys.path.insert(0, str(APPROACH2_DIR))
-
-from risk_scoring.evidence_allowlist import get_query  # noqa: E402
-from risk_scoring.evidence_client import CypherExecutor, EvidenceClient  # noqa: E402
-from risk_scoring.graph_expansion import (  # noqa: E402
+from risk_scoring.evidence_allowlist import get_query
+from risk_scoring.evidence_client import CypherExecutor, EvidenceClient
+from risk_scoring.graph_expansion import (
     get_resource_blast_radius,
     get_template_blast_radius,
     get_service_blast_radius,

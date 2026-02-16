@@ -3,7 +3,7 @@
     "neo4j-database": {
       "command": "/home/anuj/.local/bin/uvx",
       "args": [ "--native-tls", "mcp-neo4j-cypher@0.5.2", "--transport", "stdio"  ],
-      "envFile": "${workspaceFolder}/approach2-using-existing-graph/.env"
+      "envFile": "${workspaceFolder}/.env"
     },
     "beads": {
       "type": "stdio",
@@ -16,8 +16,8 @@
     "risk-scoring": {
       "command": "${workspaceFolder}/.venv/bin/python3",
       "args": ["-m", "risk_scoring.mcp_server"],
-      "cwd": "${workspaceFolder}/approach2-using-existing-graph",
-      "envFile": "${workspaceFolder}/approach2-using-existing-graph/.env"
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env"
     }
   }
 }

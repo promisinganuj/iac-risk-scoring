@@ -1,13 +1,7 @@
-import sys
 import unittest
-from pathlib import Path
 
-THIS_DIR = Path(__file__).resolve().parent
-APPROACH2_DIR = THIS_DIR.parent.parent
-sys.path.insert(0, str(APPROACH2_DIR))
-
-from risk_scoring.evidence_client import CypherExecutor, EvidenceClient  # noqa: E402
-from risk_scoring.evidence_allowlist import ParameterValidationError  # noqa: E402
+from risk_scoring.evidence_client import CypherExecutor, EvidenceClient
+from risk_scoring.evidence_allowlist import ParameterValidationError
 
 
 class FakeExecutor(CypherExecutor):

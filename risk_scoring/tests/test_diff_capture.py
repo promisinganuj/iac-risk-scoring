@@ -1,13 +1,6 @@
-import sys
 import unittest
-from pathlib import Path
 
-# Ensure approach2-using-existing-graph is on sys.path so we can import risk_scoring.
-THIS_DIR = Path(__file__).resolve().parent
-APPROACH2_DIR = THIS_DIR.parent.parent
-sys.path.insert(0, str(APPROACH2_DIR))
-
-from risk_scoring.diff_capture import capture_normalized_diff  # noqa: E402
+from risk_scoring.diff_capture import capture_normalized_diff
 
 
 class FakeGit:

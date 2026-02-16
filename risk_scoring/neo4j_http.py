@@ -40,7 +40,7 @@ class Neo4jHttpConfig:
         password = (os.environ.get("NEO4J_PASSWORD") or "").strip()
         if not password:
             raise Neo4jHttpError(
-                "Missing NEO4J_PASSWORD. Ensure you've loaded approach2-using-existing-graph/.env before running."
+                "Missing NEO4J_PASSWORD. Ensure you've loaded .env before running."
             )
 
         database = (os.environ.get("NEO4J_DATABASE") or "neo4j").strip() or "neo4j"

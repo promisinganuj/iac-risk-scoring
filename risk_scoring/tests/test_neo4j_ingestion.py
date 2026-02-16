@@ -10,14 +10,7 @@ Note: These are integration tests that require a running Neo4j instance.
 They can be skipped if NEO4J_URI environment variable is not set.
 """
 import os
-import sys
 import unittest
-from pathlib import Path
-
-# Ensure approach2-using-existing-graph is on sys.path
-THIS_DIR = Path(__file__).resolve().parent
-APPROACH2_DIR = THIS_DIR.parent.parent
-sys.path.insert(0, str(APPROACH2_DIR))
 
 # Skip all tests if Neo4j connection not configured
 NEO4J_URI = os.getenv("NEO4J_URI")
@@ -25,8 +18,8 @@ SKIP_REASON = "NEO4J_URI not set - skipping integration tests"
 
 
 try:
-    from risk_scoring.neo4j_http import Neo4jHttpClient  # noqa: E402
-    from risk_scoring.neo4j_http_repository import Neo4jHttpRepository  # noqa: E402
+    from risk_scoring.neo4j_http import Neo4jHttpClient
+    from risk_scoring.neo4j_http_repository import Neo4jHttpRepository
 except ImportError:
     Neo4jHttpClient = None
     Neo4jHttpRepository = None

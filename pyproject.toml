@@ -1,0 +1,28 @@
+[project]
+name = "iac-risk-scoring"
+version = "0.1.0"
+description = "Risk scoring for Azure infrastructure-as-code changes"
+requires-python = ">=3.10"
+dependencies = [
+    "azure-identity",
+    "python-dotenv",
+    "mcp>=1.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+    "pytest",
+]
+
+[project.scripts]
+risk-scoring = "risk_scoring.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["risk_scoring/tests"]
+pythonpath = ["."]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[tool.setuptools.packages.find]
+include = ["risk_scoring*", "api*"]

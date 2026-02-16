@@ -48,7 +48,6 @@ factors = result["score"]["factors"]
 
 **Option A: CLI Tool**
 ```bash
-cd approach2-using-existing-graph
 python -m risk_scoring --resource-id "<resource_id>" --environment <env>
 ```
 
@@ -98,7 +97,6 @@ Ask for:
 **Using CLI (current recommended approach):**
 
 ```bash
-cd /home/anujparashar/github/iac-risk-scoring/approach2-using-existing-graph
 export $(cat .env | grep -v '^#' | xargs)
 python -m risk_scoring --resource-id "<resource_id>" --environment <env>
 ```
@@ -376,8 +374,8 @@ result = mcp_risk_scoring_assess(
 
 ## References
 
-- Risk Scoring Engine: [approach2-using-existing-graph/risk_scoring/](../../approach2-using-existing-graph/risk_scoring/)
+- Risk Scoring Engine: [risk_scoring/](../../risk_scoring/)
 - MCP Server: [approach2-using-existing-graph/README.md](../../approach2-using-existing-graph/README.md) (Section 8)
-- CLI Documentation: [approach2-using-existing-graph/README.md](../../approach2-using-existing-graph/README.md) (Section 6)
-- FastAPI Service: [approach2-using-existing-graph/README.md](../../approach2-using-existing-graph/README.md) (Section 7)
+- CLI Documentation: [README.md](../../README.md)
+- FastAPI Service: [README.md](../../README.md)
 - Beads issue tracking: `iac-risk-scoring-5gd` (MCP server implementation)

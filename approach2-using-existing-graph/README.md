@@ -1,4 +1,8 @@
-# Approach 2 (existing graph)
+# Approach 2 — Neo4j Setup & Sample Data
+
+> **Note**: The `risk_scoring/` engine package has graduated to the repository root.
+> This folder now contains only Neo4j infrastructure (Docker, sample data, import scripts).
+> See the [root README](../README.md) for engine usage.
 
 Run Neo4j in Docker, ingest the sample CSV dataset, and query it via the Neo4j MCP server.
 

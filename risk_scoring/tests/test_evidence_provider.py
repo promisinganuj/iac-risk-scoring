@@ -380,3 +380,37 @@ class TestProviderOrdering:
         # All keys should be unknown since there's no service_name.
         assert len(result.unknowns) == 4
         client.execute.assert_not_called()
+
+
+# ============================================================
+# KustoEvidenceProvider with registry
+# ============================================================
+
+
+class TestKustoProviderWithRegistry:
+    """Test KustoEvidenceProvider when initialised with a KustoSourceRegistry."""
+
+    def test_accepts_registry(self) -> None:
+        from risk_scoring.kusto_source_config import KustoSourceRegistry
+
+        mock_registry = MagicMock(spec=KustoSourceRegistry)
+        provider = KustoEvidenceProvider(mock_registry)
+        assert provider.name == "kusto-icm"
+
+    def test_registry_queries_use_correct_client(self) -> None:
+        from risk_scoring.kusto_source_config import KustoSourceRegistry
+
+        mock_registry = MagicMock(spec=KustoSourceRegistry)
+        mock_client = MagicMock()
+        mock_client.execute.return_value = [{"open_icms": 7}]
+        mock_registry.get_client.return_value = mock_client
+
+        provider = KustoEvidenceProvider(mock_registry)
+        evidence: Dict[str, Any] = {"service_name": "TestService"}
+        provider.populate(_resolved(), evidence)
+
+        # The provider should have called get_client for each query's source.
+        assert mock_registry.get_client.call_count == 4
+        # All calls should have been for "icm" source (k1, k4, k5, k6).
+        for call in mock_registry.get_client.call_args_list:
+            assert call[0][0] == "icm"

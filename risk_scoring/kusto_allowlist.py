@@ -55,6 +55,7 @@ class KqlQuerySpec:
     query_id: str
     kql: str
     params: tuple[ParamSpec, ...]
+    source: str = ""  # logical source name from kusto_sources.yaml
     max_take: int = 1000
     default_take: int = 100
     evidence_key: str = ""
@@ -145,22 +146,12 @@ def build_kql(query: KqlQuerySpec, validated_params: Dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# IcM cluster / database constants
+# IcM / Service Tree table references
 # ---------------------------------------------------------------------------
 
-# -- IcM cluster --
-_ICM_CLUSTER = "icmcluster.kusto.windows.net"
-_ICM_DATABASE = "IcMDataWarehouse"
+# Plain table name — queries run against the database defined in
+# kusto_sources.yaml, so no cross-cluster() qualifier is needed.
 _ICM_TABLE = "IncidentsSnapshotV2"
-
-# Fully qualified table reference for cross-cluster queries.
-_ICM_FQ_TABLE = (
-    f"cluster('{_ICM_CLUSTER}').database('{_ICM_DATABASE}').{_ICM_TABLE}"
-)
-
-# -- Service Tree cluster --
-_ST_CLUSTER = "servicetreepublic.westus.kusto.windows.net"
-_ST_DATABASE = "Shared"
 
 
 # ---------------------------------------------------------------------------
@@ -180,13 +171,14 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
     "k1.open_icms": KqlQuerySpec(
         query_id="k1.open_icms",
         kql=(
-            f"{_ICM_FQ_TABLE}\n"
+            f"{_ICM_TABLE}\n"
             "| where OwningTenantName == {serviceName}\n"
             "| where isempty(ResolveDate)\n"
             "| summarize open_icms = count()\n"
             "| take {take}"
         ),
         params=(_SERVICE_NAME_PARAM,),
+        source="icm",
         max_take=1,
         default_take=1,
         evidence_key="open_icms",
@@ -197,7 +189,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
     "k4.avg_mttm": KqlQuerySpec(
         query_id="k4.avg_mttm",
         kql=(
-            f"{_ICM_FQ_TABLE}\n"
+            f"{_ICM_TABLE}\n"
             "| where OwningTenantName == {serviceName}\n"
             "| where isnotempty(ImpactStartDate) and isnotempty(MitigateDate)\n"
             "| where ImpactStartDate > ago(180d)\n"
@@ -207,6 +199,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
             "| take {take}"
         ),
         params=(_SERVICE_NAME_PARAM,),
+        source="icm",
         max_take=1,
         default_take=1,
         evidence_key="avg_mttm_minutes",
@@ -217,7 +210,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
     "k5.outages_180d": KqlQuerySpec(
         query_id="k5.outages_180d",
         kql=(
-            f"{_ICM_FQ_TABLE}\n"
+            f"{_ICM_TABLE}\n"
             "| where OwningTenantName == {serviceName}\n"
             "| where IsOutage == true\n"
             "| where CreateDate > ago(180d)\n"
@@ -225,6 +218,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
             "| take {take}"
         ),
         params=(_SERVICE_NAME_PARAM,),
+        source="icm",
         max_take=1,
         default_take=1,
         evidence_key="historical_outages_180d",
@@ -235,7 +229,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
     "k6.related_incidents": KqlQuerySpec(
         query_id="k6.related_incidents",
         kql=(
-            f"let service_incidents = {_ICM_FQ_TABLE}\n"
+            f"let service_incidents = {_ICM_TABLE}\n"
             "    | where OwningTenantName == {serviceName}\n"
             "    | where CreateDate > ago(90d)\n"
             "    | where isnotempty(ParentIncidentId) and ParentIncidentId > 0\n"
@@ -244,6 +238,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
             "| take {take}"
         ),
         params=(_SERVICE_NAME_PARAM,),
+        source="icm",
         max_take=1,
         default_take=1,
         evidence_key="related_incidents",
@@ -260,6 +255,7 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
             "| take {take}"
         ),
         params=(_SERVICE_NAME_PARAM,),
+        source="service_tree",
         max_take=10,
         default_take=1,
         evidence_key="service_tree_id",

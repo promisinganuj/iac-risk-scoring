@@ -207,6 +207,10 @@ class TestQuerySpecInvariants:
         for qid, q in KQL_ALLOWLIST.items():
             assert q.evidence_key, f"{qid} is missing evidence_key"
 
+    def test_all_queries_have_source(self) -> None:
+        for qid, q in KQL_ALLOWLIST.items():
+            assert q.source, f"{qid} is missing source"
+
     def test_all_icm_queries_reference_icm_table(self) -> None:
         for qid, q in KQL_ALLOWLIST.items():
             if qid.startswith("k7."):  # Service Tree queries don't use IcM table

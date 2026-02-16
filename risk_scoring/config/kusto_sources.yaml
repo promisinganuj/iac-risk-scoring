@@ -1,0 +1,27 @@
+# Kusto source definitions for evidence collection.
+#
+# Each entry maps a logical source name to a cluster URL and default database.
+# KQL query specs in kusto_allowlist.py reference these source names via their
+# `source` field.
+#
+# Auth method is NOT stored here — it comes from the KUSTO_AUTH_METHOD env var
+# (one of: az_cli, default, mi) so the same config works across environments.
+#
+# Override path: set KUSTO_SOURCES_PATH env var to point to an alternate YAML.
+
+kusto_sources:
+  icm:
+    cluster: https://icmcluster.kusto.windows.net
+    database: IcMDataWarehouse
+
+  service_tree:
+    cluster: https://servicetreepublic.westus.kusto.windows.net
+    database: Shared
+
+  # ── Future sources (uncomment when queries are added) ──
+  # ev2:
+  #   cluster: https://ev2cluster.kusto.windows.net
+  #   database: EV2DataWarehouse
+  # change:
+  #   cluster: https://changecluster.kusto.windows.net
+  #   database: ChangeDataWarehouse

@@ -1,15 +1,15 @@
 """Kusto-backed evidence provider for IcM/Outage data.
 
 Populates scoring evidence keys by executing allowlisted KQL queries
-directly against the IcM Kusto cluster. Assumes the caller is already
-authenticated (KustoClient is pre-configured with appropriate credentials).
+against the appropriate Kusto cluster (determined by each query's ``source``
+field and the ``KustoSourceRegistry`` YAML config).
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from risk_scoring.evidence_provider import ProviderResult
 from risk_scoring.graph_expansion import QueryRun
@@ -20,13 +20,18 @@ from risk_scoring.kusto_allowlist import (
     validate_kql_params,
 )
 from risk_scoring.kusto_client import KustoClient, KustoQueryError
+from risk_scoring.kusto_source_config import KustoSourceRegistry
 from risk_scoring.models import ResolvedEntityRef
 
 logger = logging.getLogger(__name__)
 
 
 class KustoEvidenceProvider:
-    """Evidence provider that queries IcM Kusto for incident/outage data.
+    """Evidence provider that queries Kusto for incident/outage data.
+
+    Accepts either a ``KustoSourceRegistry`` (preferred — multi-cluster) or a
+    plain ``KustoClient`` (backward-compatible — single cluster, all queries
+    run against that one client).
 
     Responsible evidence keys:
     - open_icms
@@ -35,8 +40,15 @@ class KustoEvidenceProvider:
     - related_incidents
     """
 
-    def __init__(self, client: KustoClient) -> None:
-        self._client = client
+    def __init__(
+        self, client_or_registry: Union[KustoClient, KustoSourceRegistry]
+    ) -> None:
+        if isinstance(client_or_registry, KustoSourceRegistry):
+            self._registry: Optional[KustoSourceRegistry] = client_or_registry
+            self._client: Optional[KustoClient] = None
+        else:
+            self._registry = None
+            self._client = client_or_registry
 
     @property
     def name(self) -> str:
@@ -118,7 +130,9 @@ class KustoEvidenceProvider:
         validated = validate_kql_params(spec, params)
         kql = build_kql(spec, validated)
 
-        rows = self._client.execute(kql)
+        # Resolve the correct client for this query's source.
+        client = self._client_for(spec.source)
+        rows = client.execute(kql)
 
         qr = QueryRun(
             query_id=query_id,
@@ -138,3 +152,15 @@ class KustoEvidenceProvider:
                 except (ValueError, TypeError):
                     return None, qr
         return None, qr
+
+    def _client_for(self, source: str) -> KustoClient:
+        """Return the KustoClient for the given logical source name.
+
+        When constructed with a registry, looks up the source; when
+        constructed with a plain client, always returns that client.
+        """
+        if self._registry is not None:
+            return self._registry.get_client(source)
+        # Fallback: single-client mode (backward compat / tests).
+        assert self._client is not None
+        return self._client

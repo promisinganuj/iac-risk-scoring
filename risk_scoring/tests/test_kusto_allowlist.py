@@ -154,6 +154,26 @@ class TestBuildKql:
         assert f"'{_VALID_SERVICE_NAME}'" in kql
         assert "ServiceId" in kql
 
+    def test_k8_deployment_count_30d(self) -> None:
+        q = get_kql_query("k8.deployment_count_30d")
+        assert q.source == "safefly"
+        params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
+        kql = build_kql(q, params)
+        assert "SafeFlyRequestCurrentMV" in kql
+        assert "ServiceName ==" in kql
+        assert "ago(30d)" in kql
+        assert "deployment_count_30d = count()" in kql
+
+    def test_k9_deployment_failures(self) -> None:
+        q = get_kql_query("k9.deployment_failures")
+        assert q.source == "safefly"
+        params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
+        kql = build_kql(q, params)
+        assert "SafeFlyRequestCurrentMV" in kql
+        assert "ago(90d)" in kql
+        assert "'Abandoned', 'Rejected'" in kql
+        assert "deployment_stage_failures = count()" in kql
+
     def test_unsafe_characters_rejected(self) -> None:
         q = get_kql_query("k1.open_icms")
         # Inject a serviceName with KQL injection attempt
@@ -213,9 +233,15 @@ class TestQuerySpecInvariants:
 
     def test_all_icm_queries_reference_icm_table(self) -> None:
         for qid, q in KQL_ALLOWLIST.items():
-            if qid.startswith("k7."):  # Service Tree queries don't use IcM table
+            if q.source != "icm":  # Only IcM queries should reference the IcM table
                 continue
             assert "IncidentsSnapshotV2" in q.kql, f"{qid} should reference IcM table"
+
+    def test_safefly_queries_reference_safefly_table(self) -> None:
+        for qid, q in KQL_ALLOWLIST.items():
+            if q.source != "safefly":
+                continue
+            assert "SafeFlyRequestCurrentMV" in q.kql, f"{qid} should reference SafeFly table"
 
     def test_default_take_within_max(self) -> None:
         for qid, q in KQL_ALLOWLIST.items():

@@ -61,6 +61,8 @@ class KustoEvidenceProvider:
         "k4.avg_mttm": "avg_mttm_minutes",
         "k5.outages_180d": "historical_outages_180d",
         "k6.related_incidents": "related_incidents",
+        "k8.deployment_count_30d": "deployment_count_30d",
+        "k9.deployment_failures": "deployment_stage_failures",
     }
 
     def populate(

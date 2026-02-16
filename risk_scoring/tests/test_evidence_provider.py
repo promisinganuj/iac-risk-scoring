@@ -219,6 +219,8 @@ class TestKustoEvidenceProvider:
             "avg_mttm_minutes": [{"avg_mttm_minutes": 42}],
             "historical_outages_180d": [{"historical_outages_180d": 2}],
             "related_incidents": [{"related_incidents": 1}],
+            "deployment_count_30d": [{"deployment_count_30d": 12}],
+            "deployment_stage_failures": [{"deployment_stage_failures": 3}],
         })
         provider = KustoEvidenceProvider(client)
         evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
@@ -228,8 +230,10 @@ class TestKustoEvidenceProvider:
         assert evidence["avg_mttm_minutes"] == 42
         assert evidence["historical_outages_180d"] == 2
         assert evidence["related_incidents"] == 1
+        assert evidence["deployment_count_30d"] == 12
+        assert evidence["deployment_stage_failures"] == 3
         assert result.unknown_keys == ()
-        assert len(result.populated_keys) == 4
+        assert len(result.populated_keys) == 6
 
     def test_no_service_name_marks_all_unknown(self) -> None:
         client = MagicMock()
@@ -237,7 +241,7 @@ class TestKustoEvidenceProvider:
         evidence: Dict[str, Any] = {}
         result = provider.populate(_resolved(), evidence)
 
-        assert len(result.unknown_keys) == 4
+        assert len(result.unknown_keys) == 6
         assert result.populated_keys == ()
         # Client should NOT have been called.
         client.execute.assert_not_called()
@@ -261,7 +265,7 @@ class TestKustoEvidenceProvider:
         result = provider.populate(_resolved(), evidence)
 
         # First query failed, but others should still run.
-        assert client.execute.call_count == 4
+        assert client.execute.call_count == 6
         assert any(k in result.unknown_keys for k in ["open_icms"])
 
     def test_empty_result_marks_unknown(self) -> None:
@@ -271,7 +275,7 @@ class TestKustoEvidenceProvider:
         evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
-        assert len(result.unknown_keys) == 4
+        assert len(result.unknown_keys) == 6
         assert len(result.populated_keys) == 0
 
     def test_provider_name(self) -> None:
@@ -285,9 +289,10 @@ class TestKustoEvidenceProvider:
         evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
-        assert len(result.queries) == 4
+        assert len(result.queries) == 6
         query_ids = [q.query_id for q in result.queries]
         assert "k1.open_icms" in query_ids
+        assert "k8.deployment_count_30d" in query_ids
 
 
 # ============================================================
@@ -378,7 +383,7 @@ class TestProviderOrdering:
         result = run_providers([provider], _resolved())
 
         # All keys should be unknown since there's no service_name.
-        assert len(result.unknowns) == 4
+        assert len(result.unknowns) == 6
         client.execute.assert_not_called()
 
 
@@ -410,7 +415,8 @@ class TestKustoProviderWithRegistry:
         provider.populate(_resolved(), evidence)
 
         # The provider should have called get_client for each query's source.
-        assert mock_registry.get_client.call_count == 4
-        # All calls should have been for "icm" source (k1, k4, k5, k6).
-        for call in mock_registry.get_client.call_args_list:
-            assert call[0][0] == "icm"
+        assert mock_registry.get_client.call_count == 6
+        # Calls should be for "icm" and "safefly" sources.
+        source_names = [call[0][0] for call in mock_registry.get_client.call_args_list]
+        assert "icm" in source_names
+        assert "safefly" in source_names

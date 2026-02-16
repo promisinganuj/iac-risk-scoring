@@ -153,6 +153,9 @@ def build_kql(query: KqlQuerySpec, validated_params: Dict[str, Any]) -> str:
 # kusto_sources.yaml, so no cross-cluster() qualifier is needed.
 _ICM_TABLE = "IncidentsSnapshotV2"
 
+# SafeFly deployment request table.
+_SAFEFLY_TABLE = "SafeFlyRequestCurrentMV"
+
 
 # ---------------------------------------------------------------------------
 # Allowlisted KQL queries — IcM / Outage
@@ -260,6 +263,43 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
         default_take=1,
         evidence_key="service_tree_id",
         description="Resolve a service name to its Service Tree ServiceId and metadata.",
+    ),
+
+    # k8 — Count of SafeFly deployment requests in the last 30 days
+    "k8.deployment_count_30d": KqlQuerySpec(
+        query_id="k8.deployment_count_30d",
+        kql=(
+            f"{_SAFEFLY_TABLE}\n"
+            "| where ServiceName == {serviceName}\n"
+            "| where CreatedDate > ago(30d)\n"
+            "| summarize deployment_count_30d = count()\n"
+            "| take {take}"
+        ),
+        params=(_SERVICE_NAME_PARAM,),
+        source="safefly",
+        max_take=1,
+        default_take=1,
+        evidence_key="deployment_count_30d",
+        description="Count of SafeFly deployment requests in the last 30 days.",
+    ),
+
+    # k9 — Count of abandoned/rejected deployments (proxy for stage failures)
+    "k9.deployment_failures": KqlQuerySpec(
+        query_id="k9.deployment_failures",
+        kql=(
+            f"{_SAFEFLY_TABLE}\n"
+            "| where ServiceName == {serviceName}\n"
+            "| where CreatedDate > ago(90d)\n"
+            "| where Status in ('Abandoned', 'Rejected')\n"
+            "| summarize deployment_stage_failures = count()\n"
+            "| take {take}"
+        ),
+        params=(_SERVICE_NAME_PARAM,),
+        source="safefly",
+        max_take=1,
+        default_take=1,
+        evidence_key="deployment_stage_failures",
+        description="Count of abandoned or rejected SafeFly requests in the last 90 days.",
     ),
 }
 

@@ -1,211 +1,403 @@
-"""Command-line interface for risk scoring."""
+"""Command-line interface for risk scoring.
+
+Supports three data-source modes:
+
+- **neo4j** (legacy): entity resolution + evidence from Neo4j graph.
+- **kusto**: evidence from Kusto (IcM, SafeFly). Requires ``--service-name``.
+- **hybrid**: Neo4j for entity resolution + graph evidence, Kusto for
+  IcM/SafeFly evidence. Both backends must be configured.
+- **auto** (default): detect available backends from env vars / config.
+"""
 
 import argparse
+import logging
 import os
 import sys
 from datetime import date
-from typing import Optional
+from typing import List, Optional, Sequence
 
-from risk_scoring.engine import assess_resource_change
+from risk_scoring.engine import assess_resource_change, assess_with_providers
 from risk_scoring.evidence_client import CypherExecutor, EvidenceClient
-from risk_scoring.models import ResourceSpec
+from risk_scoring.evidence_provider import EvidenceProvider
+from risk_scoring.models import ResolvedEntityRef, ResourceSpec
 from risk_scoring.neo4j_http import Neo4jHttpConfig, Neo4jHttpError
 from risk_scoring.neo4j_http_executor import Neo4jHttpExecutor
 from risk_scoring.neo4j_http_repository import Neo4jHttpEntityRepository
 from risk_scoring.scoring import ChangeContext
 
+logger = logging.getLogger(__name__)
+
+_DATA_SOURCES = ("auto", "kusto", "neo4j", "hybrid")
+
+
+# ---------------------------------------------------------------------------
+# Argument parser
+# ---------------------------------------------------------------------------
 
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser for the CLI."""
     parser = argparse.ArgumentParser(
-        prog='risk_scoring',
-        description='Assess risk for Azure resource changes using Neo4j graph data',
+        prog="risk_scoring",
+        description="Assess risk for Azure resource changes",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Score a resource change in production environment
+  # Neo4j-only (legacy): resolve resource via graph, score from graph evidence
   python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod
+
+  # Kusto-only: score using IcM/SafeFly data (requires --service-name)
+  python -m risk_scoring --service-name "My Service" --environment prod \\
+      --data-source kusto
+
+  # Hybrid: Neo4j resolution + graph evidence, then Kusto IcM/SafeFly
+  python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod \\
+      --data-source hybrid
+
+  # Auto-detect backends (default)
+  python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod \\
+      --data-source auto
+
+  # Repo URI (resolves to service via Service Tree, requires Kusto)
+  python -m risk_scoring --repo-uri "https://dev.azure.com/org/project/_git/repo" \\
+      --environment prod
 
   # Output as JSON to a file
   python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod \\
       --output-format json --output-file report.json
-
-  # Force HTTP executor instead of MCP
-  python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod --use-http
-
-  # Enable verbose debug logging
-  python -m risk_scoring --resource-id "rg-prod-web-01" --environment prod --verbose
-"""
+""",
     )
 
-    # Required arguments
+    # --- Identity group (mutually-exclusive) ---
+    identity = parser.add_argument_group(
+        "resource identity (at least one required)"
+    )
+    identity.add_argument(
+        "--resource-id",
+        help='Azure resource ID to assess (e.g., "rg-prod-web-01")',
+    )
+    identity.add_argument(
+        "--service-name",
+        help="Service name to query Kusto evidence (matches OwningTenantName in IcM)",
+    )
+    identity.add_argument(
+        "--repo-uri",
+        help="Azure DevOps repo URI (resolves to service via Service Tree)",
+    )
+
+    # --- Required ---
     parser.add_argument(
-        '--resource-id',
+        "--environment",
         required=True,
-        help='Azure resource ID to assess (e.g., "rg-prod-web-01")'
-    )
-    
-    parser.add_argument(
-        '--environment',
-        required=True,
-        choices=['prod', 'staging', 'dev', 'test'],
-        help='Environment where the resource exists'
+        choices=["prod", "staging", "dev", "test"],
+        help="Environment where the resource exists",
     )
 
-    # Optional arguments
+    # --- Data-source ---
     parser.add_argument(
-        '--output-format',
-        default='markdown',
-        choices=['json', 'markdown', 'both'],
-        help='Output format (default: markdown)'
+        "--data-source",
+        default="auto",
+        choices=list(_DATA_SOURCES),
+        help="Evidence backend: auto (detect), kusto, neo4j, or hybrid (default: auto)",
     )
-    
+
+    # --- Output ---
     parser.add_argument(
-        '--output-file',
-        help='Write output to file instead of stdout'
+        "--output-format",
+        default="markdown",
+        choices=["json", "markdown", "both"],
+        help="Output format (default: markdown)",
     )
-    
     parser.add_argument(
-        '--use-http',
-        action='store_true',
-        help='Force HTTP executor instead of MCP (requires NEO4J_* env vars)'
+        "--output-file",
+        help="Write output to file instead of stdout",
     )
-    
+
+    # --- Misc ---
     parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose debug logging'
+        "--use-http",
+        action="store_true",
+        help="Force HTTP Neo4j executor (requires NEO4J_* env vars)",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose debug logging",
     )
 
     return parser
 
 
-def main(argv: Optional[list] = None) -> int:
+# ---------------------------------------------------------------------------
+# Backend detection helpers
+# ---------------------------------------------------------------------------
+
+def _neo4j_available() -> bool:
+    """Return True if Neo4j credentials are configured."""
+    return bool(os.environ.get("NEO4J_PASSWORD"))
+
+
+def _kusto_available() -> bool:
+    """Return True if Kusto can be used (YAML exists or env var set)."""
+    if os.environ.get("KUSTO_AUTH_METHOD"):
+        return True
+    # Check for bundled YAML
+    from pathlib import Path
+    yaml_path = Path(__file__).resolve().parent / "config" / "kusto_sources.yaml"
+    return yaml_path.exists()
+
+
+def _resolve_data_source(requested: str) -> str:
+    """Resolve 'auto' to a concrete data source, or validate the request."""
+    if requested != "auto":
+        return requested
+
+    neo4j = _neo4j_available()
+    kusto = _kusto_available()
+
+    if neo4j and kusto:
+        return "hybrid"
+    if kusto:
+        return "kusto"
+    if neo4j:
+        return "neo4j"
+    raise SystemExit(
+        "Error: cannot auto-detect data source. "
+        "Set NEO4J_PASSWORD for Neo4j or KUSTO_AUTH_METHOD for Kusto."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Provider construction
+# ---------------------------------------------------------------------------
+
+def _build_providers(
+    data_source: str,
+    *,
+    verbose: bool = False,
+) -> tuple[
+    List[EvidenceProvider],
+    Optional["Neo4jHttpEntityRepository"],  # repo (only when neo4j involved)
+]:
+    """Construct evidence providers for the resolved data source.
+
+    Returns (providers, repo).  ``repo`` is non-None only when Neo4j is
+    part of the pipeline and entity resolution is needed.
     """
-    Main entry point for the CLI.
-    
-    Args:
-        argv: Command-line arguments (defaults to sys.argv[1:])
-        
-    Returns:
-        Exit code (0 = success, 1 = error)
+    providers: List[EvidenceProvider] = []
+    repo: Optional[Neo4jHttpEntityRepository] = None
+
+    # --- Neo4j ---
+    if data_source in ("neo4j", "hybrid"):
+        config = Neo4jHttpConfig.from_env()
+        executor: CypherExecutor = Neo4jHttpExecutor(config)
+        evidence_client = EvidenceClient(executor)
+        repo = Neo4jHttpEntityRepository(config)
+
+        from risk_scoring.neo4j_evidence_provider import Neo4jEvidenceProvider
+
+        providers.append(Neo4jEvidenceProvider(evidence_client))
+        if verbose:
+            logger.info("Neo4j evidence provider enabled")
+
+    # --- Kusto ---
+    if data_source in ("kusto", "hybrid"):
+        from risk_scoring.kusto_evidence_provider import KustoEvidenceProvider
+        from risk_scoring.kusto_source_config import KustoSourceRegistry
+
+        registry = KustoSourceRegistry.from_yaml()
+        providers.append(KustoEvidenceProvider(registry))
+        if verbose:
+            logger.info(
+                "Kusto evidence provider enabled (sources: %s)",
+                ", ".join(registry.list_sources()),
+            )
+
+    if not providers:
+        raise SystemExit(
+            f"Error: no evidence providers available for --data-source={data_source}"
+        )
+
+    return providers, repo
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+def main(argv: Optional[list] = None) -> int:
+    """CLI entry point.
+
+    Returns exit code: 0 = success, 1 = runtime error, 2 = config error.
     """
     parser = create_parser()
     args = parser.parse_args(argv)
 
-    # Configure logging based on verbose flag
+    # --- Logging ---
     if args.verbose:
-        import logging
         logging.basicConfig(
             level=logging.DEBUG,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
-    
+
+    # --- Validate identity flags ---
+    if not args.resource_id and not args.service_name and not args.repo_uri:
+        parser.error(
+            "at least one of --resource-id, --service-name, or --repo-uri is required"
+        )
+
+    if args.repo_uri:
+        # repo-uri is a future feature; for now require --service-name alongside
+        parser.error(
+            "--repo-uri is not yet supported. "
+            "Please use --service-name to supply the service name directly."
+        )
+
     try:
-        # Initialize Neo4j executor
-        executor = _create_executor(use_http=args.use_http, verbose=args.verbose)
-        
-        # Create repository and evidence client
-        if args.use_http or not _is_mcp_available():
-            # HTTP path requires config for repository too
-            config = Neo4jHttpConfig.from_env()
-            repo = Neo4jHttpEntityRepository(config)
-        else:
-            # MCP path: repository also needs to query Neo4j, use HTTP for now
-            # TODO: Consider MCP-based repository if needed
-            config = Neo4jHttpConfig.from_env()
-            repo = Neo4jHttpEntityRepository(config)
-        
-        evidence_client = EvidenceClient(executor)
-        
-        # Build inputs
-        resource_spec = ResourceSpec(resource_id=args.resource_id)
+        # --- Resolve data source ---
+        data_source = _resolve_data_source(args.data_source)
+        if args.verbose:
+            logger.info("Data source: %s", data_source)
+
+        # --- Validate flag combinations ---
+        if data_source == "kusto" and not args.service_name:
+            print(
+                "Error: --data-source=kusto requires --service-name "
+                "(Kusto queries need a service name to match OwningTenantName)",
+                file=sys.stderr,
+            )
+            return 1
+
+        if data_source in ("neo4j", "hybrid") and not args.resource_id:
+            print(
+                f"Error: --data-source={data_source} requires --resource-id "
+                "for Neo4j entity resolution",
+                file=sys.stderr,
+            )
+            return 1
+
+        # --- Build pipeline ---
         change_context = ChangeContext.create(environment=args.environment)
-        
-        # Run assessment
-        result = assess_resource_change(
-            repo=repo,
-            evidence_client=evidence_client,
-            resource=resource_spec,
-            change=change_context,
-            as_of=date.today(),
-            report_id=f"cli-{args.resource_id}-{args.environment}"
-        )
-        
-        # Output results
+        report_id_base = args.resource_id or args.service_name or "unknown"
+        report_id = f"cli-{report_id_base}-{args.environment}"
+
+        if data_source == "neo4j" and not args.service_name:
+            # Pure legacy path — existing assess_resource_change()
+            result = _run_legacy_neo4j(args, change_context, report_id)
+        else:
+            # Provider-based path
+            result = _run_providers(args, data_source, change_context, report_id)
+
         _write_output(result, args)
-        
         return 0
-        
+
     except KeyboardInterrupt:
         print("\nInterrupted by user", file=sys.stderr)
-        return 130  # Standard Unix exit code for SIGINT
-    
+        return 130
+
     except Neo4jHttpError as e:
         print(f"Neo4j configuration error: {e}", file=sys.stderr)
-        print("\nEnsure you have set the following environment variables:", file=sys.stderr)
-        print("  NEO4J_HTTP_URL (or NEO4J_HOST and NEO4J_HTTP_PORT)", file=sys.stderr)
-        print("  NEO4J_USERNAME (default: neo4j)", file=sys.stderr)
-        print("  NEO4J_PASSWORD (required)", file=sys.stderr)
-        print("  NEO4J_DATABASE (default: neo4j)", file=sys.stderr)
+        print(
+            "\nEnsure these env vars are set:\n"
+            "  NEO4J_HTTP_URL (or NEO4J_HOST + NEO4J_HTTP_PORT)\n"
+            "  NEO4J_USERNAME (default: neo4j)\n"
+            "  NEO4J_PASSWORD (required)\n"
+            "  NEO4J_DATABASE (default: neo4j)",
+            file=sys.stderr,
+        )
         if args.verbose:
             import traceback
+
             traceback.print_exc()
-        return 2  # Configuration error
-        
+        return 2
+
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
-def _is_mcp_available() -> bool:
-    """Check if MCP Neo4j tools are available in this environment."""
-    # In a CLI context, MCP tools are typically not available
-    # This would only work in an agent/LLM context
-    return False
+# ---------------------------------------------------------------------------
+# Pipeline runners
+# ---------------------------------------------------------------------------
+
+def _run_legacy_neo4j(args, change_context, report_id):
+    """Legacy Neo4j-only assessment (no Kusto)."""
+    config = Neo4jHttpConfig.from_env()
+    executor = Neo4jHttpExecutor(config)
+    repo = Neo4jHttpEntityRepository(config)
+    evidence_client = EvidenceClient(executor)
+    resource_spec = ResourceSpec(resource_id=args.resource_id)
+
+    return assess_resource_change(
+        repo=repo,
+        evidence_client=evidence_client,
+        resource=resource_spec,
+        change=change_context,
+        as_of=date.today(),
+        report_id=report_id,
+    )
 
 
-def _create_executor(use_http: bool, verbose: bool) -> CypherExecutor:
-    """Create the appropriate CypherExecutor based on availability and flags."""
-    if use_http or not _is_mcp_available():
-        if verbose:
-            print("Using Neo4j HTTP executor", file=sys.stderr)
-        config = Neo4jHttpConfig.from_env()
-        return Neo4jHttpExecutor(config)
+def _run_providers(args, data_source, change_context, report_id):
+    """Provider-based assessment (kusto, hybrid, or neo4j+service_name)."""
+    providers, repo = _build_providers(data_source, verbose=args.verbose)
+
+    # Determine resolution strategy
+    resource: Optional[ResourceSpec] = None
+    resolved: Optional[ResolvedEntityRef] = None
+
+    if args.resource_id and repo is not None:
+        # Neo4j resolution path
+        resource = ResourceSpec(resource_id=args.resource_id)
     else:
-        # MCP path (not available in standalone CLI)
-        if verbose:
-            print("Using Neo4j MCP executor", file=sys.stderr)
-        from risk_scoring.mcp_executor import McpNeo4jExecutor
-        # This will raise an error in CLI context, which is expected
-        return McpNeo4jExecutor()
+        # Kusto-only or service-name supplied: build a synthetic resolved ref
+        # so providers can use service_name in evidence dict.
+        resource_id = args.resource_id or args.service_name or "unknown"
+        resolved = ResolvedEntityRef(
+            label="Service",
+            resource_id=resource_id,
+            display_name=args.service_name,
+        )
 
+    return assess_with_providers(
+        repo=repo,
+        providers=providers,
+        resource=resource,
+        resolved=resolved,
+        change=change_context,
+        as_of=date.today(),
+        report_id=report_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
 
 def _write_output(result, args) -> None:
     """Write the assessment result to the specified output."""
-    output_format = args.output_format
-    output_file = args.output_file
-    
-    # Determine what to write
-    if output_format == 'json':
+    fmt = args.output_format
+
+    if fmt == "json":
         content = result.report_json_string()
-    elif output_format == 'markdown':
+    elif fmt == "markdown":
         content = result.report_markdown
     else:  # both
-        content = f"# JSON Report\n\n```json\n{result.report_json_string()}\n```\n\n"
-        content += f"# Markdown Report\n\n{result.report_markdown}"
-    
-    # Write to file or stdout
-    if output_file:
-        with open(output_file, 'w') as f:
+        content = (
+            f"# JSON Report\n\n```json\n{result.report_json_string()}\n```\n\n"
+            f"# Markdown Report\n\n{result.report_markdown}"
+        )
+
+    if args.output_file:
+        with open(args.output_file, "w") as f:
             f.write(content)
-        print(f"Report written to {output_file}", file=sys.stderr)
+        print(f"Report written to {args.output_file}", file=sys.stderr)
     else:
         print(content)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -95,9 +95,10 @@ def assess_resource_change(
 
 def assess_with_providers(
     *,
-    repo: EntityRepository,
+    repo: Optional[EntityRepository] = None,
     providers: Sequence[EvidenceProvider],
-    resource: ResourceSpec,
+    resource: Optional[ResourceSpec] = None,
+    resolved: Optional[ResolvedEntityRef] = None,
     change: ChangeContext,
     as_of: Optional[date] = None,
     report_id: Optional[str] = None,
@@ -105,7 +106,7 @@ def assess_with_providers(
     """Provider-based assessment pipeline.
 
     Pipeline:
-    1) Resolve ResourceSpec -> ResolvedEntityRef
+    1) Resolve ResourceSpec -> ResolvedEntityRef (or use pre-resolved)
     2) Run evidence providers sequentially (each populates evidence keys)
     3) Score deterministically from merged evidence
     4) Build JSON + Markdown reports
@@ -113,15 +114,26 @@ def assess_with_providers(
     Providers run in order — later providers can see evidence set by earlier
     ones. For example, order Neo4j first (to set service_id) then Kusto
     (which needs service_id to query IcM).
+
+    Supply either ``resolved`` directly (Kusto-only mode) or ``resource``
+    + ``repo`` for Neo4j-backed entity resolution.
     """
 
-    resolved = resolve_azure_resource(repo, resource, non_interactive=True)
+    if resolved is None:
+        if resource is None or repo is None:
+            raise ValueError(
+                "Either 'resolved' or both 'resource' and 'repo' are required."
+            )
+        resolved = resolve_azure_resource(repo, resource, non_interactive=True)
 
     expansion = run_providers(
         providers,
         resolved,
         as_of=as_of,
-        initial_evidence={"resource_id": resolved.resource_id},
+        initial_evidence={
+            "resource_id": resolved.resource_id,
+            **({"service_name": resolved.display_name} if resolved.display_name else {}),
+        },
     )
 
     score = score_change(change, expansion.evidence)

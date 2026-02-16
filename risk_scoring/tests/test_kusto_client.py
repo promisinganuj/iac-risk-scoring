@@ -35,6 +35,10 @@ class TestKustoConfigFromEnv:
                 monkeypatch.delenv(key, raising=False)
             else:
                 monkeypatch.setenv(key, val)
+        # Clear env vars not explicitly set so tests don't leak host config.
+        for key in ("KUSTO_AUTH_METHOD", "KUSTO_MI_CLIENT_ID", "KUSTO_TIMEOUT_SECS"):
+            if key not in defaults:
+                monkeypatch.delenv(key, raising=False)
 
     def test_minimal_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._set_env(monkeypatch)

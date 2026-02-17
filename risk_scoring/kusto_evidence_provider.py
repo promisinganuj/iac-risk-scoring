@@ -8,6 +8,7 @@ field and the ``KustoSourceRegistry`` YAML config).
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date
 from typing import Any, Dict, List, Optional, Union
 
@@ -45,6 +46,9 @@ class KustoEvidenceProvider:
     - subscription_count
     - source_repos  (list of repo dicts from Service Tree)
     - repo_count  (number of source code repos registered)
+    - services_impacted  (blast radius: 1 when service is known)
+    - critical_services  (blast radius: from ServiceLevel/IsExternalFacing)
+    - peer_resource_count  (blast radius: unknown without ARG)
     """
 
     def __init__(
@@ -100,6 +104,9 @@ class KustoEvidenceProvider:
                 "subscription_count",
                 "source_repos",
                 "repo_count",
+                "services_impacted",
+                "critical_services",
+                "peer_resource_count",
             ]
             for ek in all_keys:
                 evidence.setdefault(ek, None)
@@ -131,8 +138,8 @@ class KustoEvidenceProvider:
                 evidence.setdefault(evidence_key, None)
                 unknowns.append(evidence_key)
 
-        # --- Phase 2: Service Tree lookup (k7) → ServiceId ---
-        service_id = self._resolve_service_id(
+        # --- Phase 2: Service Tree lookup (k7) → ServiceId + metadata ---
+        service_id, service_meta = self._resolve_service_id(
             service_name, evidence, queries, populated, unknowns
         )
 
@@ -146,6 +153,11 @@ class KustoEvidenceProvider:
             service_id, evidence, queries, populated, unknowns
         )
 
+        # --- Phase 5: Blast radius from Service Tree joins ---
+        self._compute_blast_radius(
+            service_name, service_meta, evidence, populated, unknowns
+        )
+
         return ProviderResult(
             provider_name=self.name,
             queries=tuple(queries),
@@ -157,6 +169,15 @@ class KustoEvidenceProvider:
     # Phase 2: Service Tree ID resolution
     # ------------------------------------------------------------------
 
+    @dataclass
+    class _ServiceMeta:
+        """Service Tree metadata extracted from k7 for blast radius."""
+        service_level: Optional[str] = None
+        is_external_facing: Optional[bool] = None
+        lifecycle_stage: Optional[str] = None
+        organization: Optional[str] = None
+        short_name: Optional[str] = None
+
     def _resolve_service_id(
         self,
         service_name: str,
@@ -164,8 +185,12 @@ class KustoEvidenceProvider:
         queries: List[QueryRun],
         populated: List[str],
         unknowns: List[str],
-    ) -> Optional[str]:
-        """Run k7.service_tree_lookup to get the ServiceId for a service name."""
+    ) -> tuple[Optional[str], Optional["KustoEvidenceProvider._ServiceMeta"]]:
+        """Run k7.service_tree_lookup to get ServiceId and metadata.
+
+        Returns (service_id, service_meta).  ``service_meta`` carries
+        ServiceLevel / IsExternalFacing used by Phase 5 blast radius.
+        """
         try:
             spec = get_kql_query("k7.service_tree_lookup")
             params = {"serviceName": service_name}
@@ -183,15 +208,23 @@ class KustoEvidenceProvider:
             queries.append(qr)
 
             if rows:
-                service_id = rows[0].get("ServiceId")
+                row = rows[0]
+                service_id = row.get("ServiceId")
+                meta = self._ServiceMeta(
+                    service_level=row.get("ServiceLevel"),
+                    is_external_facing=row.get("IsExternalFacing"),
+                    lifecycle_stage=row.get("ServiceLifecycleStage"),
+                    organization=row.get("Organization"),
+                    short_name=row.get("ShortName"),
+                )
                 if service_id:
                     evidence["service_tree_id"] = service_id
                     populated.append("service_tree_id")
-                    return str(service_id)
+                    return str(service_id), meta
 
             evidence.setdefault("service_tree_id", None)
             unknowns.append("service_tree_id")
-            return None
+            return None, None
 
         except (KustoQueryError, Exception) as exc:
             logger.warning(
@@ -199,7 +232,7 @@ class KustoEvidenceProvider:
             )
             evidence.setdefault("service_tree_id", None)
             unknowns.append("service_tree_id")
-            return None
+            return None, None
 
     # ------------------------------------------------------------------
     # Phase 3: Subscription mapping
@@ -322,6 +355,70 @@ class KustoEvidenceProvider:
             evidence.setdefault("source_repos", None)
             evidence.setdefault("repo_count", None)
             unknowns.extend(["source_repos", "repo_count"])
+
+    # ------------------------------------------------------------------
+    # Phase 5: Blast radius derivation from Service Tree joins
+    # ------------------------------------------------------------------
+
+    def _compute_blast_radius(
+        self,
+        service_name: Optional[str],
+        service_meta: Optional["KustoEvidenceProvider._ServiceMeta"],
+        evidence: Dict[str, Any],
+        populated: List[str],
+        unknowns: List[str],
+    ) -> None:
+        """Derive blast radius evidence from Service Tree data.
+
+        Evidence keys populated:
+        - ``services_impacted``: 1 when service context is available, 0
+          otherwise.  In Kusto-only mode we resolve a single service,
+          so multi-service blast radius is not available.
+        - ``critical_services``: list of service names whose ServiceLevel
+          is high or that are external-facing (from k7 metadata).
+        - ``peer_resource_count``: always None — requires Azure Resource
+          Graph which is not a standard Kusto source.  Gracefully
+          degrades to "unknown" in scoring.
+        """
+        # --- services_impacted ---
+        if service_name and isinstance(service_name, str) and service_name.strip():
+            evidence["services_impacted"] = 1
+            populated.append("services_impacted")
+        else:
+            evidence.setdefault("services_impacted", None)
+            unknowns.append("services_impacted")
+
+        # --- critical_services ---
+        if service_meta is not None:
+            critical: List[str] = []
+            is_critical = False
+
+            # External-facing services are considered critical.
+            if service_meta.is_external_facing is True:
+                is_critical = True
+
+            # High service levels (numeric string "1" or "2", or known
+            # labels like "Ring 0", "Ring 1") are considered critical.
+            sl = service_meta.service_level
+            if sl is not None:
+                sl_str = str(sl).strip().lower()
+                if sl_str in ("1", "2", "ring 0", "ring 1"):
+                    is_critical = True
+
+            if is_critical and service_name:
+                critical.append(service_name)
+
+            evidence["critical_services"] = critical
+            populated.append("critical_services")
+        else:
+            evidence.setdefault("critical_services", None)
+            unknowns.append("critical_services")
+
+        # --- peer_resource_count ---
+        # Not available from Service Tree — requires ARM / Azure Resource Graph.
+        # Gracefully degrade: leave as unknown so scoring assigns 0 points.
+        evidence.setdefault("peer_resource_count", None)
+        unknowns.append("peer_resource_count")
 
     # ------------------------------------------------------------------
     # Internal helpers

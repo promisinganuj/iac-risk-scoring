@@ -206,8 +206,8 @@ unknown.
 | # | Factor ID | Title | Max | Evidence Key(s) | Source |
 |---|-----------|-------|-----|-----------------|--------|
 | 1 | `env.production` | Production environment | 20 | `change.environment` | Change context |
-| 2 | `blast_radius.services` | Services impacted | 25 | `services_impacted` | Neo4j |
-| 3 | `blast_radius.critical_services` | Critical services | 15 | `critical_services` | Neo4j |
+| 2 | `blast_radius.services` | Services impacted | 25 | `services_impacted` | Neo4j / Kusto |
+| 3 | `blast_radius.critical_services` | Critical services | 15 | `critical_services` | Neo4j / Kusto (k7) |
 | 3b | `blast_radius.subscriptions` | Subscriptions | 10 | `subscription_count` | Kusto (k10) |
 | 4 | `history.outages_180d` | Recent outages | 10 | `historical_outages_180d` | Kusto (k5) |
 | 5 | `ops.open_icms` | Open incidents | 5 | `open_icms` | Kusto (k1) |
@@ -216,7 +216,7 @@ unknown.
 | 8 | `deployment.stage_failures` | Stage failures | 15 | `deployment_stage_failures` | Kusto (k9) |
 | 9 | `incident.mttm` | Slow mitigation | 10 | `avg_mttm_minutes` | Kusto (k4) |
 | 10 | `artifact.deep_deps` | Deep dependencies | 10 | `max_dependency_depth` | Neo4j |
-| 11 | `resource.peer_impact` | Peer resources | 8 | `peer_resource_count` | Neo4j |
+| 11 | `resource.peer_impact` | Peer resources | 8 | `peer_resource_count` | Neo4j (Kusto: unknown) |
 | 12 | `incident.recurrence` | Incident recurrence | 12 | `related_incidents` | Kusto (k6) |
 | 13 | `template.complexity` | Template complexity | 10 | `template_required_dep…`, `template_max_dep…` | Neo4j |
 | | | **Total possible** | **170** | | |
@@ -231,7 +231,7 @@ Evidence is gathered by pluggable providers before scoring runs:
 | Provider | Keys Populated |
 |----------|----------------|
 | `Neo4jEvidenceProvider` | `services_impacted`, `critical_services`, `max_dependency_depth`, `peer_resource_count`, `template_required_dependency_count`, `template_max_dependency_depth` |
-| `KustoEvidenceProvider` | `open_icms`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count` |
+| `KustoEvidenceProvider` | `open_icms`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count`, `services_impacted`, `critical_services`, `peer_resource_count` |
 
 The KQL queries are defined in `risk_scoring/kusto_allowlist.py`:
 

@@ -41,6 +41,7 @@
                                   │   IcM incidents  │
                                   │   SafeFly deploys│
                                   │   Service Tree   │
+                                  │   blast radius†  │
                                   └────────┬─────────┘
                                            │
                                   ┌────────┴─────────┐
@@ -73,11 +74,19 @@ earlier ones. The recommended order:
 1. **Neo4jEvidenceProvider** — sets `service_name`, `service_id`,
    `services_impacted`, graph-based evidence.
 2. **KustoEvidenceProvider** — uses `service_name` to query IcM/SafeFly.
-   Internally runs a 3-phase pipeline:
+   Internally runs a 5-phase pipeline:
    - Phase 1: Scalar IcM/SafeFly queries (k1, k4–k6, k8–k9)
-   - Phase 2: k7 service tree lookup → ServiceId
+   - Phase 2: k7 service tree lookup → ServiceId + metadata
    - Phase 3: k10 subscription mapping using ServiceId from phase 2
    - Phase 4: k12 source repos enrichment using ServiceId from phase 2
+   - Phase 5: Blast radius derivation from Service Tree metadata
+     (`services_impacted`, `critical_services` from k7 ServiceLevel/
+     IsExternalFacing; `peer_resource_count` marked unknown)
+
+   > † In Kusto-only mode, `services_impacted` is always 1 (single
+   > service resolution). `critical_services` is derived from k7's
+   > `ServiceLevel` and `IsExternalFacing` fields. `peer_resource_count`
+   > requires Azure Resource Graph and is left as unknown (0 points).
 
 ### 3. Scoring
 
@@ -104,9 +113,10 @@ ResolvedEntityRef(display_name="My Service")
  ▼
 KustoEvidenceProvider
  ├─ Phase 1: k1, k4, k5, k6 (IcM) → k8, k9 (SafeFly)
- ├─ Phase 2: k7 (Service Tree) → ServiceId
+ ├─ Phase 2: k7 (Service Tree) → ServiceId + metadata
  ├─ Phase 3: k10 (subscriptions)
- └─ Phase 4: k12 (source repos)
+ ├─ Phase 4: k12 (source repos)
+ └─ Phase 5: blast radius (services_impacted, critical_services)
  │
  ▼
 score_change() → ScoreResult → report

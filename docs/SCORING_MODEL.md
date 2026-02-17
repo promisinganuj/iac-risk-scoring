@@ -216,7 +216,7 @@ unknown.
 | 8 | `deployment.stage_failures` | Stage failures | 15 | `deployment_stage_failures` | Kusto (k9) |
 | 9 | `incident.mttm` | Slow mitigation | 10 | `avg_mttm_minutes` | Kusto (k4) |
 | 10 | `artifact.deep_deps` | Deep dependencies | 10 | `max_dependency_depth` | Neo4j |
-| 11 | `resource.peer_impact` | Peer resources | 8 | `peer_resource_count` | Neo4j (Kusto: unknown) |
+| 11 | `resource.peer_impact` | Peer resources | 8 | `peer_resource_count` | Neo4j (Kusto: `iac-risk-scoring-8to`) |
 | 12 | `incident.recurrence` | Incident recurrence | 12 | `related_incidents` | Kusto (k6) |
 | 13 | `template.complexity` | Template complexity | 10 | `template_required_dep…`, `template_max_dep…` | Neo4j |
 | | | **Total possible** | **170** | | |

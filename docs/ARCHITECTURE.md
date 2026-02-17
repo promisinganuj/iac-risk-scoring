@@ -41,7 +41,7 @@
                                   │   IcM incidents  │
                                   │   SafeFly deploys│
                                   │   Service Tree   │
-                                  │   blast radius†  │
+                                  │   blast radius   │
                                   └────────┬─────────┘
                                            │
                                   ┌────────┴─────────┐
@@ -84,10 +84,10 @@ earlier ones. The recommended order:
      (`services_impacted`, `critical_services` from k7 ServiceLevel/
      IsExternalFacing; `peer_resource_count` marked unknown)
 
-   > † In Kusto-only mode, `services_impacted` is always 1 (single
+   > **Note:** In Kusto-only mode, `services_impacted` is always 1 (single
    > service resolution). `critical_services` is derived from k7's
    > `ServiceLevel` and `IsExternalFacing` fields. `peer_resource_count`
-   > requires Azure Resource Graph and is left as unknown (0 points).
+   > requires Azure Resource Graph — see `iac-risk-scoring-8to`.
 
 ### 3. Scoring
 

@@ -144,7 +144,7 @@ CLI / FastAPI / MCP Server
                              ├── IcM (incidents, outages, MTTM)
                              ├── SafeFly (deployments, failures)
                              ├── Service Tree (ServiceId, subscriptions)
-                             └── Blast radius (services, critical svc†)
+                             └── Blast radius (services, critical svc)
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full pipeline,

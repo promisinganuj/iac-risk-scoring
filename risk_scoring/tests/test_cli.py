@@ -15,6 +15,7 @@ from risk_scoring.cli import (
     _kusto_available,
     _neo4j_available,
     _resolve_data_source,
+    _resolve_repo_to_service,
     create_parser,
     main,
 )
@@ -197,12 +198,14 @@ class TestMainValidation(unittest.TestCase):
             main(["--environment", "prod"])
         self.assertEqual(ctx.exception.code, 2)
 
-    def test_repo_uri_not_yet_supported(self):
-        with self.assertRaises(SystemExit) as ctx:
-            main(
-                ["--repo-uri", "https://dev.azure.com/a/b/_git/c", "--environment", "prod"]
-            )
-        self.assertEqual(ctx.exception.code, 2)
+    @patch("risk_scoring.cli._resolve_repo_to_service", return_value=None)
+    @patch("risk_scoring.cli._resolve_data_source", return_value="kusto")
+    def test_repo_uri_unresolvable_errors(self, _rds, _rr):
+        """--repo-uri that cannot be resolved to a service should fail."""
+        code = main(
+            ["--repo-uri", "https://dev.azure.com/a/b/_git/c", "--environment", "prod"]
+        )
+        self.assertEqual(code, 1)
 
     @patch("risk_scoring.cli._resolve_data_source", return_value="kusto")
     def test_kusto_without_service_name_errors(self, _rd):
@@ -336,6 +339,133 @@ class TestMainExceptionHandling(unittest.TestCase):
             ["--resource-id", "res-x", "--environment", "prod", "--data-source", "neo4j"]
         )
         self.assertEqual(code, 2)
+
+
+
+# ---------------------------------------------------------------------------
+# Repo-URI resolution
+# ---------------------------------------------------------------------------
+
+
+class TestResolveRepoToService(unittest.TestCase):
+    """Test _resolve_repo_to_service helper."""
+
+    @patch("risk_scoring.kusto_source_config.KustoSourceRegistry")
+    def test_successful_resolution(self, MockRegistry):
+        mock_reg = MagicMock()
+        mock_reg.resolve_service_from_repo.return_value = "Azure Postgres Flex"
+        MockRegistry.from_yaml.return_value = mock_reg
+
+        result = _resolve_repo_to_service("https://dev.azure.com/org/proj/_git/repo")
+        self.assertEqual(result, "Azure Postgres Flex")
+        mock_reg.resolve_service_from_repo.assert_called_once_with(
+            "https://dev.azure.com/org/proj/_git/repo"
+        )
+
+    @patch("risk_scoring.kusto_source_config.KustoSourceRegistry")
+    def test_resolution_returns_none_when_no_match(self, MockRegistry):
+        mock_reg = MagicMock()
+        mock_reg.resolve_service_from_repo.return_value = None
+        MockRegistry.from_yaml.return_value = mock_reg
+
+        result = _resolve_repo_to_service("https://dev.azure.com/org/proj/_git/unknown")
+        self.assertIsNone(result)
+
+    @patch("risk_scoring.kusto_source_config.KustoSourceRegistry")
+    def test_resolution_returns_none_on_exception(self, MockRegistry):
+        MockRegistry.from_yaml.side_effect = RuntimeError("Kusto unavailable")
+
+        result = _resolve_repo_to_service("https://dev.azure.com/org/proj/_git/repo")
+        self.assertIsNone(result)
+
+
+# ---------------------------------------------------------------------------
+# main() repo-URI integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestMainRepoUri(unittest.TestCase):
+    """Test --repo-uri flows through main()."""
+
+    @patch("risk_scoring.cli._run_providers")
+    @patch("risk_scoring.cli._resolve_repo_to_service", return_value="My Svc")
+    @patch("risk_scoring.cli._resolve_data_source", return_value="kusto")
+    def test_repo_uri_resolves_and_runs(self, _rds, _rr, mock_prov):
+        """--repo-uri that resolves to a service should proceed normally."""
+        mock_result = MagicMock()
+        mock_result.report_markdown = "# Report"
+        mock_prov.return_value = mock_result
+
+        code = main(
+            ["--repo-uri", "https://dev.azure.com/org/proj/_git/repo",
+             "--environment", "prod"]
+        )
+        self.assertEqual(code, 0)
+        mock_prov.assert_called_once()
+
+        # Verify the resolved service_name was promoted
+        call_args = mock_prov.call_args
+        args_passed = call_args[0][0]  # first positional arg is args namespace
+        self.assertEqual(args_passed.service_name, "My Svc")
+
+    @patch("risk_scoring.cli._resolve_repo_to_service", return_value=None)
+    @patch("risk_scoring.cli._resolve_data_source", return_value="kusto")
+    def test_repo_uri_no_match_returns_1(self, _rds, _rr):
+        """--repo-uri with no service match should return exit code 1."""
+        code = main(
+            ["--repo-uri", "https://dev.azure.com/org/proj/_git/nope",
+             "--environment", "prod"]
+        )
+        self.assertEqual(code, 1)
+
+    @patch("risk_scoring.cli._resolve_data_source", return_value="neo4j")
+    def test_repo_uri_without_kusto_returns_1(self, _rds):
+        """--repo-uri with neo4j-only data source should fail."""
+        code = main(
+            ["--repo-uri", "https://dev.azure.com/org/proj/_git/repo",
+             "--environment", "prod", "--data-source", "neo4j"]
+        )
+        self.assertEqual(code, 1)
+
+    @patch("risk_scoring.cli._run_providers")
+    @patch("risk_scoring.cli._resolve_repo_to_service", return_value="Svc X")
+    @patch("risk_scoring.cli._resolve_data_source", return_value="hybrid")
+    def test_repo_uri_hybrid_mode(self, _rds, _rr, mock_prov):
+        """--repo-uri should also work in hybrid mode."""
+        mock_result = MagicMock()
+        mock_result.report_markdown = "# Report"
+        mock_prov.return_value = mock_result
+
+        code = main(
+            ["--repo-uri", "https://dev.azure.com/org/proj/_git/repo",
+             "--resource-id", "res-x",
+             "--environment", "prod", "--data-source", "hybrid"]
+        )
+        self.assertEqual(code, 0)
+        mock_prov.assert_called_once()
+
+    @patch("risk_scoring.cli._run_providers")
+    @patch("risk_scoring.cli._resolve_repo_to_service", return_value="Resolved Svc")
+    @patch("risk_scoring.cli._resolve_data_source", return_value="kusto")
+    def test_repo_uri_sets_label_repository(self, _rds, _rr, mock_prov):
+        """When --repo-uri without --resource-id, label should be 'Repository'."""
+        mock_result = MagicMock()
+        mock_result.report_markdown = "# Report"
+        mock_prov.return_value = mock_result
+
+        code = main(
+            ["--repo-uri", "https://dev.azure.com/org/proj/_git/repo",
+             "--environment", "prod"]
+        )
+        self.assertEqual(code, 0)
+
+        # _run_providers builds a ResolvedEntityRef — verify it was called
+        call_args = mock_prov.call_args
+        args_passed = call_args[0][0]
+        # service_name should be promoted from repo resolution
+        self.assertEqual(args_passed.service_name, "Resolved Svc")
+        # repo_uri should still be set
+        self.assertEqual(args_passed.repo_uri, "https://dev.azure.com/org/proj/_git/repo")
 
 
 # ---------------------------------------------------------------------------

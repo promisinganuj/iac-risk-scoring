@@ -237,8 +237,8 @@ class TestKustoEvidenceProvider:
         assert evidence["deployment_stage_failures"] == 3
         assert evidence["service_tree_id"] == "abc-123"
         assert evidence["subscription_count"] == 1
-        assert result.unknown_keys == ()
-        assert len(result.populated_keys) == 11
+        assert result.unknown_keys == ("peer_resource_count",)
+        assert len(result.populated_keys) == 13
 
     def test_no_service_name_marks_all_unknown(self) -> None:
         client = MagicMock()
@@ -246,7 +246,7 @@ class TestKustoEvidenceProvider:
         evidence: Dict[str, Any] = {}
         result = provider.populate(_resolved(), evidence)
 
-        assert len(result.unknown_keys) == 11
+        assert len(result.unknown_keys) == 14
         assert result.populated_keys == ()
         # Client should NOT have been called.
         client.execute.assert_not_called()
@@ -283,8 +283,8 @@ class TestKustoEvidenceProvider:
         result = provider.populate(_resolved(), evidence)
 
         # 6 scalar + service_tree_id unknown; subscriptions + repos also unknown since no ServiceId
-        assert len(result.unknown_keys) == 11
-        assert len(result.populated_keys) == 0
+        assert len(result.unknown_keys) == 13
+        assert len(result.populated_keys) == 1
 
     def test_provider_name(self) -> None:
         provider = KustoEvidenceProvider(MagicMock())
@@ -392,7 +392,7 @@ class TestProviderOrdering:
         result = run_providers([provider], _resolved())
 
         # All keys should be unknown since there's no service_name.
-        assert len(result.unknowns) == 11
+        assert len(result.unknowns) == 14
         client.execute.assert_not_called()
 
 

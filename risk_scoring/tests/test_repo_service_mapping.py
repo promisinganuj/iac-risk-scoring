@@ -368,4 +368,4 @@ class TestPhase4ServiceRepos:
 
         assert "source_repos" in result.unknown_keys
         assert "repo_count" in result.unknown_keys
-        assert len(result.unknown_keys) == 11  # 9 original + 2 new
+        assert len(result.unknown_keys) == 14  # 9 original + 2 repos + 3 blast radius

@@ -3,7 +3,8 @@
 Supports three data-source modes:
 
 - **neo4j** (legacy): entity resolution + evidence from Neo4j graph.
-- **kusto**: evidence from Kusto (IcM, SafeFly). Requires ``--service-name``.
+- **kusto**: evidence from Kusto (IcM, SafeFly). Requires ``--service-name``
+  or ``--repo-uri`` (resolved to service via k11).
 - **hybrid**: Neo4j for entity resolution + graph evidence, Kusto for
   IcM/SafeFly evidence. Both backends must be configured.
 - **auto** (default): detect available backends from env vars / config.
@@ -224,6 +225,29 @@ def _build_providers(
 # Main entry point
 # ---------------------------------------------------------------------------
 
+def _resolve_repo_to_service(
+    repo_uri: str,
+    *,
+    verbose: bool = False,
+) -> Optional[str]:
+    """Resolve a repo URI to a service name via Kusto k11 query.
+
+    Returns the service name if found, or None.
+    """
+    try:
+        from risk_scoring.kusto_source_config import KustoSourceRegistry
+
+        registry = KustoSourceRegistry.from_yaml()
+        service_name = registry.resolve_service_from_repo(repo_uri)
+        return service_name
+    except Exception as exc:
+        if verbose:
+            logger.warning(
+                "Repo → service resolution failed: %s", exc, exc_info=True
+            )
+        return None
+
+
 def main(argv: Optional[list] = None) -> int:
     """CLI entry point.
 
@@ -245,23 +269,45 @@ def main(argv: Optional[list] = None) -> int:
             "at least one of --resource-id, --service-name, or --repo-uri is required"
         )
 
-    if args.repo_uri:
-        # repo-uri is a future feature; for now require --service-name alongside
-        parser.error(
-            "--repo-uri is not yet supported. "
-            "Please use --service-name to supply the service name directly."
-        )
-
     try:
         # --- Resolve data source ---
         data_source = _resolve_data_source(args.data_source)
         if args.verbose:
             logger.info("Data source: %s", data_source)
 
+        # --- Repo URI → service name resolution (k11) ---
+        if args.repo_uri:
+            if data_source not in ("kusto", "hybrid"):
+                print(
+                    "Error: --repo-uri requires Kusto (--data-source=kusto or "
+                    "hybrid) for Service Tree k11 lookup",
+                    file=sys.stderr,
+                )
+                return 1
+
+            resolved_service = _resolve_repo_to_service(args.repo_uri,
+                                                        verbose=args.verbose)
+            if resolved_service is None:
+                print(
+                    f"Error: could not resolve --repo-uri {args.repo_uri!r} "
+                    "to a service in Service Tree. "
+                    "Use --service-name to supply the service name directly.",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # Promote to service_name for the rest of the pipeline
+            if args.verbose:
+                logger.info(
+                    "Resolved repo %s → service %r",
+                    args.repo_uri, resolved_service,
+                )
+            args.service_name = resolved_service
+
         # --- Validate flag combinations ---
         if data_source == "kusto" and not args.service_name:
             print(
-                "Error: --data-source=kusto requires --service-name "
+                "Error: --data-source=kusto requires --service-name or --repo-uri "
                 "(Kusto queries need a service name to match OwningTenantName)",
                 file=sys.stderr,
             )
@@ -277,7 +323,7 @@ def main(argv: Optional[list] = None) -> int:
 
         # --- Build pipeline ---
         change_context = ChangeContext.create(environment=args.environment)
-        report_id_base = args.resource_id or args.service_name or "unknown"
+        report_id_base = args.resource_id or args.service_name or args.repo_uri or "unknown"
         report_id = f"cli-{report_id_base}-{args.environment}"
 
         if data_source == "neo4j" and not args.service_name:
@@ -356,10 +402,14 @@ def _run_providers(args, data_source, change_context, report_id):
         # Kusto-only or service-name supplied: build a synthetic resolved ref
         # so providers can use service_name in evidence dict.
         resource_id = args.resource_id or args.service_name or "unknown"
+        display = args.service_name
+        label = "Service"
+        if args.repo_uri and not args.resource_id:
+            label = "Repository"
         resolved = ResolvedEntityRef(
-            label="Service",
+            label=label,
             resource_id=resource_id,
-            display_name=args.service_name,
+            display_name=display,
         )
 
     return assess_with_providers(

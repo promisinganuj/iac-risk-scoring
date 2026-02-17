@@ -43,6 +43,8 @@ class KustoEvidenceProvider:
     - service_tree_id  (ServiceId from Service Tree)
     - service_subscriptions  (list of subscription dicts)
     - subscription_count
+    - source_repos  (list of repo dicts from Service Tree)
+    - repo_count  (number of source code repos registered)
     """
 
     def __init__(
@@ -96,6 +98,8 @@ class KustoEvidenceProvider:
                 "service_tree_id",
                 "service_subscriptions",
                 "subscription_count",
+                "source_repos",
+                "repo_count",
             ]
             for ek in all_keys:
                 evidence.setdefault(ek, None)
@@ -134,6 +138,11 @@ class KustoEvidenceProvider:
 
         # --- Phase 3: Subscription mapping (k10) → subscription list ---
         self._resolve_subscriptions(
+            service_id, evidence, queries, populated, unknowns
+        )
+
+        # --- Phase 4: Source repos enrichment (k12) → repo list ---
+        self._resolve_service_repos(
             service_id, evidence, queries, populated, unknowns
         )
 
@@ -252,6 +261,67 @@ class KustoEvidenceProvider:
             evidence.setdefault("service_subscriptions", None)
             evidence.setdefault("subscription_count", None)
             unknowns.extend(["service_subscriptions", "subscription_count"])
+
+    # ------------------------------------------------------------------
+    # Phase 4: Source code repos enrichment
+    # ------------------------------------------------------------------
+
+    def _resolve_service_repos(
+        self,
+        service_id: Optional[str],
+        evidence: Dict[str, Any],
+        queries: List[QueryRun],
+        populated: List[str],
+        unknowns: List[str],
+    ) -> None:
+        """Run k12.service_repos to get source code repo URLs for a service."""
+        if not service_id:
+            evidence.setdefault("source_repos", None)
+            evidence.setdefault("repo_count", None)
+            unknowns.extend(["source_repos", "repo_count"])
+            return
+
+        try:
+            spec = get_kql_query("k12.service_repos")
+            params = {"serviceId": service_id}
+            validated = validate_kql_params(spec, params)
+            kql = build_kql(spec, validated)
+            client = self._client_for(spec.source)
+            rows = client.execute(kql)
+
+            qr = QueryRun(
+                query_id="k12.service_repos",
+                params={"serviceId": service_id},
+                row_count=len(rows),
+                sample_rows=tuple(rows[:5]),
+            )
+            queries.append(qr)
+
+            if rows:
+                repos = [
+                    {
+                        "repo_url": r.get("RepoUrl", ""),
+                        "source_code_type": r.get("SourceCodeType", ""),
+                        "service_id": r.get("ServiceId", ""),
+                        "service_name": r.get("ServiceName", ""),
+                    }
+                    for r in rows
+                ]
+                evidence["source_repos"] = repos
+                evidence["repo_count"] = len(repos)
+                populated.extend(["source_repos", "repo_count"])
+            else:
+                evidence["source_repos"] = []
+                evidence["repo_count"] = 0
+                populated.extend(["source_repos", "repo_count"])
+
+        except (KustoQueryError, Exception) as exc:
+            logger.warning(
+                "k12.service_repos failed: %s", exc, exc_info=True
+            )
+            evidence.setdefault("source_repos", None)
+            evidence.setdefault("repo_count", None)
+            unknowns.extend(["source_repos", "repo_count"])
 
     # ------------------------------------------------------------------
     # Internal helpers

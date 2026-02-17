@@ -231,7 +231,7 @@ Evidence is gathered by pluggable providers before scoring runs:
 | Provider | Keys Populated |
 |----------|----------------|
 | `Neo4jEvidenceProvider` | `services_impacted`, `critical_services`, `max_dependency_depth`, `peer_resource_count`, `template_required_dependency_count`, `template_max_dependency_depth` |
-| `KustoEvidenceProvider` | `open_icms`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `service_tree_id`, `service_subscriptions`, `subscription_count` |
+| `KustoEvidenceProvider` | `open_icms`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count` |
 
 The KQL queries are defined in `risk_scoring/kusto_allowlist.py`:
 
@@ -245,6 +245,8 @@ The KQL queries are defined in `risk_scoring/kusto_allowlist.py`:
 | `k8.deployment_count_30d` | `deployment_count_30d` | safefly | SafeFly deploys (30d) |
 | `k9.deployment_failures` | `deployment_stage_failures` | safefly | Abandoned/rejected deploys (90d) |
 | `k10.service_subscriptions` | `service_subscriptions` | service_tree | Service → Azure subscriptions |
+| `k11.repo_to_service` | `repo_service_mapping` | service_tree | Repo URL → ServiceId (reverse lookup) |
+| `k12.service_repos` | `source_repos` | service_tree | Service → registered source code repos |
 
 ## Unknowns
 

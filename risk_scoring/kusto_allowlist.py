@@ -346,3 +346,63 @@ KQL_ALLOWLIST["k10.service_subscriptions"] = KqlQuerySpec(
         "Service Tree GetSubscriptionsAssociatedWith()."
     ),
 )
+
+
+# ---------------------------------------------------------------------------
+# Repo → Service mapping (reverse lookup)
+# ---------------------------------------------------------------------------
+
+_REPO_URL_PARAM = ParamSpec(
+    name="repoUrl", kind="str", required=True, max_len=512
+)
+
+KQL_ALLOWLIST["k11.repo_to_service"] = KqlQuerySpec(
+    query_id="k11.repo_to_service",
+    kql=(
+        "let metadataDefId = ServiceTree_MetadataDefinition_Snapshot\n"
+        "    | where Id == 'ProdCat_SourceCodeLocation'\n"
+        "    | project InternalId;\n"
+        "ServiceTree_ServiceMetadata_Snapshot\n"
+        "| where MetadataDefinitionInternalId == toscalar(metadataDefId)"
+        " and Status < 2\n"
+        "| extend ParsedValue = todynamic(Value)\n"
+        "| where tostring(ParsedValue.RepoUrl) =~ {repoUrl}\n"
+        "| join kind=inner ServiceTree_ServiceHierarchy_Snapshot"
+        " on $left.ServiceInternalId == $right.InternalId\n"
+        "| project ServiceId = tostring(Id), ServiceName = Name\n"
+        "| take {take}"
+    ),
+    params=(_REPO_URL_PARAM,),
+    source="service_tree",
+    max_take=10,
+    default_take=5,
+    evidence_key="repo_service_mapping",
+    description=(
+        "Reverse lookup: find the Service Tree service that owns a given "
+        "source code repository URL via ProdCat_SourceCodeLocation metadata."
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Service → Repos (forward lookup for evidence enrichment)
+# ---------------------------------------------------------------------------
+
+KQL_ALLOWLIST["k12.service_repos"] = KqlQuerySpec(
+    query_id="k12.service_repos",
+    kql=(
+        "let Services = datatable(ServiceId:string)[{serviceId}];\n"
+        "GetServicesMetadataValues(Services, 'ProdCat_SourceCodeLocation')\n"
+        "| project ServiceId, ServiceName, RepoUrl, SourceCodeType\n"
+        "| take {take}"
+    ),
+    params=(_SERVICE_ID_PARAM,),
+    source="service_tree",
+    max_take=100,
+    default_take=50,
+    evidence_key="source_repos",
+    description=(
+        "Get all source code repository URLs registered in Service Tree "
+        "for a service via GetServicesMetadataValues()."
+    ),
+)

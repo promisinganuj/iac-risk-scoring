@@ -184,6 +184,64 @@ class KustoSourceRegistry:
         """Return sorted list of available source names."""
         return sorted(self.sources.keys())
 
+    # ---- repo → service resolution ----
+
+    def resolve_service_from_repo(self, repo_uri: str) -> Optional[str]:
+        """Resolve a repository URL to a Service Tree service name.
+
+        Uses the ``k11.repo_to_service`` KQL query to search Service Tree
+        ``ProdCat_SourceCodeLocation`` metadata for a matching repo URL.
+
+        Parameters
+        ----------
+        repo_uri : str
+            Full repository URL (AzDo or GitHub).
+
+        Returns
+        -------
+        str or None
+            The ``ServiceName`` from Service Tree if a unique match is found,
+            or ``None`` if no match.  If multiple services claim the same repo,
+            the first match (by ServiceName) is returned and a warning is logged.
+        """
+        from risk_scoring.kusto_allowlist import (
+            build_kql,
+            get_kql_query,
+            validate_kql_params,
+        )
+
+        normalized = normalize_repo_url(repo_uri)
+        if not normalized:
+            return None
+
+        try:
+            spec = get_kql_query("k11.repo_to_service")
+            params = {"repoUrl": normalized}
+            validated = validate_kql_params(spec, params)
+            kql = build_kql(spec, validated)
+            client = self.get_client(spec.source)
+            rows = client.execute(kql)
+        except Exception as exc:
+            logger.warning(
+                "k11.repo_to_service query failed for %r: %s",
+                repo_uri, exc, exc_info=True,
+            )
+            return None
+
+        if not rows:
+            logger.info("No Service Tree match for repo %r", repo_uri)
+            return None
+
+        service_name = rows[0].get("ServiceName")
+        if len(rows) > 1:
+            names = [r.get("ServiceName", "?") for r in rows]
+            logger.warning(
+                "Multiple services claim repo %r: %s — using first",
+                repo_uri, names,
+            )
+
+        return service_name or None
+
     def close_all(self) -> None:
         """Close all cached KustoClient instances."""
         for name, client in self._clients.items():
@@ -198,3 +256,27 @@ class KustoSourceRegistry:
 
     def __exit__(self, *exc: object) -> None:
         self.close_all()
+
+
+# ---------------------------------------------------------------------------
+# Repo URL normalization
+# ---------------------------------------------------------------------------
+
+def normalize_repo_url(url: str) -> str:
+    """Normalize a repository URL for deterministic comparison.
+
+    Strips trailing slashes, ``.git`` suffix, and lowercases the URL so that
+    minor formatting differences don't prevent a match against Service Tree
+    metadata.
+
+    Examples::
+
+        >>> normalize_repo_url("https://dev.azure.com/msazure/One/_git/MyRepo/")
+        'https://dev.azure.com/msazure/one/_git/myrepo'
+        >>> normalize_repo_url("https://github.com/Azure/my-repo.git")
+        'https://github.com/azure/my-repo'
+    """
+    url = url.strip().rstrip("/")
+    if url.lower().endswith(".git"):
+        url = url[:-4]
+    return url.lower()

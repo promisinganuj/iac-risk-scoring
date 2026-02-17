@@ -77,6 +77,7 @@ earlier ones. The recommended order:
    - Phase 1: Scalar IcM/SafeFly queries (k1, k4–k6, k8–k9)
    - Phase 2: k7 service tree lookup → ServiceId
    - Phase 3: k10 subscription mapping using ServiceId from phase 2
+   - Phase 4: k12 source repos enrichment using ServiceId from phase 2
 
 ### 3. Scoring
 
@@ -104,7 +105,8 @@ ResolvedEntityRef(display_name="My Service")
 KustoEvidenceProvider
  ├─ Phase 1: k1, k4, k5, k6 (IcM) → k8, k9 (SafeFly)
  ├─ Phase 2: k7 (Service Tree) → ServiceId
- └─ Phase 3: k10 (subscriptions)
+ ├─ Phase 3: k10 (subscriptions)
+ └─ Phase 4: k12 (source repos)
  │
  ▼
 score_change() → ScoreResult → report
@@ -216,7 +218,7 @@ risk_scoring/              Core scoring engine (Python package)
 ├── evidence_provider.py   EvidenceProvider protocol + run_providers()
 ├── kusto_evidence_provider.py   Kusto-backed provider (IcM, SafeFly, Service Tree)
 ├── neo4j_evidence_provider.py   Neo4j-backed provider (graph blast radius)
-├── kusto_allowlist.py     Allowlisted KQL queries (k1–k10)
+├── kusto_allowlist.py     Allowlisted KQL queries (k1–k12)
 ├── evidence_allowlist.py  Allowlisted Cypher queries
 ├── kusto_client.py        Azure Data Explorer SDK wrapper
 ├── kusto_source_config.py KustoSourceRegistry (YAML → cluster routing)

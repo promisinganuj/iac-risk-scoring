@@ -64,6 +64,7 @@ Converts user-provided identity to a `ResolvedEntityRef`.
 |------|-------|-------------------|
 | Neo4j | `--resource-id` | Cypher query against Neo4j graph |
 | Kusto-only | `--service-name` | Direct pass-through (service name is the identity) |
+| CLI repo | `--repo-uri` | Resolved to service name via k11 (Service Tree repo→service mapping) |
 | PR API | `repo_uri` + `target_branch` | Service name from request or repo-name fallback |
 
 ### 2. Evidence Expansion
@@ -106,6 +107,8 @@ Both use deterministic key ordering.
 
 ```
 CLI: --service-name "My Service" --data-source kusto --environment prod
+     (or --repo-uri "https://dev.azure.com/org/proj/_git/repo" → k11 → service)
+     (or --repo-uri "https://dev.azure.com/org/proj/_git/repo" → k11 → service)
  │
  ▼
 ResolvedEntityRef(display_name="My Service")
@@ -237,7 +240,7 @@ risk_scoring/              Core scoring engine (Python package)
 ├── reporting.py           JSON + Markdown report generation
 ├── cli.py                 CLI entry point
 ├── mcp_server.py          MCP server for AI agents
-└── tests/                 250 tests
+└── tests/                 ~270 tests
 
 api/                       FastAPI HTTP interface
 ├── main.py                /assess, /assess-pr, /health endpoints

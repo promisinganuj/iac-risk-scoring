@@ -46,14 +46,14 @@ python -m risk_scoring [identity flags] --environment <env> [options]
 |------|-------------|
 | `--resource-id ID` | Azure resource ID (Neo4j entity resolution) |
 | `--service-name NAME` | Service name matching IcM `OwningTenantName` (Kusto-only, no Neo4j needed) |
-| `--repo-uri URI` | Azure DevOps repo URI (used with PR API for repo-level resolution) |
+| `--repo-uri URI` | Azure DevOps repo URI (resolved to service via k11 Service Tree lookup; requires Kusto) |
 
 ### Data source
 
 | `--data-source` | Behaviour |
 |-----------------|-----------|
 | `auto` *(default)* | Detect available backends from env vars / config |
-| `kusto` | IcM + SafeFly + Service Tree evidence via Kusto only (requires `--service-name`) |
+| `kusto` | IcM + SafeFly + Service Tree evidence via Kusto only (requires `--service-name` or `--repo-uri`) |
 | `neo4j` | Graph-based evidence only |
 | `hybrid` | Neo4j for entity resolution + graph evidence, then Kusto for IcM/SafeFly/Service Tree |
 
@@ -74,6 +74,14 @@ python -m risk_scoring --resource-id "res-alpha-app" --environment prod \
 # JSON output to file
 python -m risk_scoring --resource-id "res-alpha-app" --environment prod \
     --output-format json --output-file report.json
+
+# Repo URI (resolves to service via Service Tree k11 lookup)
+python -m risk_scoring --repo-uri "https://dev.azure.com/org/project/_git/payments" \
+    --environment prod --data-source kusto
+
+# Repo URI (resolves to service via Service Tree k11 lookup)
+python -m risk_scoring --repo-uri "https://dev.azure.com/org/project/_git/payments" \
+    --environment prod --data-source kusto
 
 # Verbose logging
 python -m risk_scoring --service-name "My Service" --environment prod --verbose
@@ -164,7 +172,7 @@ thresholds, evidence keys, and data sources.
 ## Development
 
 ```bash
-# Run all tests (250 tests)
+# Run all tests (~270 tests)
 python -m pytest risk_scoring/tests/ api/tests/ -v
 
 # Start FastAPI server

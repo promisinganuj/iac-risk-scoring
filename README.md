@@ -2,9 +2,14 @@
 
 Deterministic risk scoring engine for Azure infrastructure-as-code changes.
 
-Given a resource or service identity, the engine resolves it from a graph database,
-expands evidence (incidents, deployments, blast radius), applies deterministic scoring
-rules, and produces a structured risk report.
+Given a service or resource identity, the engine gathers evidence from
+production data sources (IcM incidents, SafeFly deployments, Service Tree
+subscriptions), applies deterministic scoring rules, and produces a
+structured risk report with a 0–100 score and factor breakdown.
+
+**Goal:** Reduce outages by surfacing risk signals at PR time — before
+changes reach production. See [docs/VISION.md](docs/VISION.md) for the
+full strategy and north-star.
 
 ## Quick Start
 
@@ -17,13 +22,15 @@ uv pip install -r requirements.txt --native-tls
 cp .env.template .env
 # edit .env with your Neo4j and/or Kusto credentials
 
-# Start Neo4j and import sample data (optional — not needed for Kusto-only mode)
+# Kusto-only assessment (no Neo4j required)
+python -m risk_scoring --service-name "Azure App Service (Payments)" \
+    --environment prod --data-source kusto
+
+# Or with Neo4j sample data
 cd approach2-using-existing-graph
 export NEO4J_PASSWORD='password'
 ./scripts/neo4j_up_and_import.sh
 cd ..
-
-# Run risk assessment
 python -m risk_scoring --resource-id "res-alpha-app" --environment prod
 ```
 
@@ -39,26 +46,26 @@ python -m risk_scoring [identity flags] --environment <env> [options]
 |------|-------------|
 | `--resource-id ID` | Azure resource ID (Neo4j entity resolution) |
 | `--service-name NAME` | Service name matching IcM `OwningTenantName` (Kusto-only, no Neo4j needed) |
-| `--repo-uri URI` | Azure DevOps repo URI *(placeholder — not yet wired)* |
+| `--repo-uri URI` | Azure DevOps repo URI (used with PR API for repo-level resolution) |
 
 ### Data source
 
 | `--data-source` | Behaviour |
 |-----------------|-----------|
 | `auto` *(default)* | Detect available backends from env vars / config |
-| `kusto` | IcM + SafeFly evidence via Kusto only (requires `--service-name`) |
-| `neo4j` | Graph-based evidence only (legacy) |
-| `hybrid` | Neo4j for entity resolution + graph evidence, then Kusto for IcM/SafeFly |
+| `kusto` | IcM + SafeFly + Service Tree evidence via Kusto only (requires `--service-name`) |
+| `neo4j` | Graph-based evidence only |
+| `hybrid` | Neo4j for entity resolution + graph evidence, then Kusto for IcM/SafeFly/Service Tree |
 
 ### Examples
 
 ```bash
-# Neo4j-only (legacy)
-python -m risk_scoring --resource-id "res-alpha-app" --environment prod
-
-# Kusto-only (no Neo4j required)
+# Kusto-only (recommended — no Neo4j required)
 python -m risk_scoring --service-name "Azure Database for PostgreSQL - Flexible Server" \
     --environment prod --data-source kusto
+
+# Neo4j-only
+python -m risk_scoring --resource-id "res-alpha-app" --environment prod
 
 # Hybrid: Neo4j + Kusto
 python -m risk_scoring --resource-id "res-alpha-app" --environment prod \
@@ -69,8 +76,38 @@ python -m risk_scoring --resource-id "res-alpha-app" --environment prod \
     --output-format json --output-file report.json
 
 # Verbose logging
-python -m risk_scoring --resource-id "res-alpha-app" --environment prod --verbose
+python -m risk_scoring --service-name "My Service" --environment prod --verbose
 ```
+
+## API Usage
+
+Three interfaces share the same engine pipeline:
+
+| Interface | Usage |
+|-----------|-------|
+| **CLI** | `python -m risk_scoring --service-name <name> --environment <env>` |
+| **FastAPI** | `POST /api/v1/assess` (resource-based) or `POST /api/v1/assess-pr` (PR-based) |
+| **MCP Server** | `python -m risk_scoring.mcp_server` (AI agent consumption) |
+
+### PR Assessment API
+
+```bash
+# Start the API server
+source .env && uvicorn api.main:app --reload
+
+# Assess a PR
+curl -X POST http://localhost:8000/api/v1/assess-pr \
+  -H "Content-Type: application/json" \
+  -d '{
+    "repo_uri": "https://dev.azure.com/org/project/_git/payments",
+    "target_branch": "main",
+    "service_name": "Azure App Service (Payments)"
+  }'
+```
+
+The `target_branch` is automatically mapped to an environment (`main` → `prod`,
+`release/*` → `prod`, `staging` → `staging`, etc.). Interactive docs at
+`http://localhost:8000/docs`.
 
 ### Environment variables
 
@@ -88,82 +125,63 @@ python -m risk_scoring --resource-id "res-alpha-app" --environment prod --verbos
 CLI / FastAPI / MCP Server
          │
          ▼
-    engine.py (pipeline)
-    ┌──────────────────────────────────────────────┐
-    │ 1. Entity Resolution  →  2. Evidence Expansion │
-    │ 3. Deterministic Scoring  →  4. Report         │
-    └──────────────────────────────────────────────┘
-         │                    │
-         ▼                    ▼
+    engine.py ── pipeline ──────────────────────────
+    │ 1. Resolve  →  2. Evidence  →  3. Score  →  4. Report │
+    ─────────────────────────────────────────────────────────
+         │                │
+         ▼                ▼
     EntityRepository    EvidenceProviders
-    (Neo4j / CSV)       ┌─────────────────────┐
-                        │ Neo4jEvidenceProvider│  graph context, blast radius
-                        │ KustoEvidenceProvider│  IcM incidents, SafeFly deploys
-                        └─────────────────────┘
-                                │
-                        KustoSourceRegistry
-                        (kusto_sources.yaml)
-                        ┌─────────────────────┐
-                        │ icm         cluster  │
-                        │ service_tree cluster  │
-                        │ safefly     cluster  │
-                        └─────────────────────┘
+    (Neo4j / CSV)       ├── Neo4jEvidenceProvider (graph, blast radius)
+                        └── KustoEvidenceProvider
+                             ├── IcM (incidents, outages, MTTM)
+                             ├── SafeFly (deployments, failures)
+                             └── Service Tree (ServiceId, subscriptions)
 ```
 
-Three interfaces, one engine:
-- **CLI**: `python -m risk_scoring --resource-id <id> --environment <env>`
-- **FastAPI**: `POST /api/v1/assess` (see `api/`)
-- **MCP Server**: AI agent consumption via `risk_scoring.mcp_server`
-
-### Evidence pipeline
-
-Providers run sequentially — later providers can use context set by earlier ones.
-The recommended order is Neo4j first (sets `service_name`, `service_id`), then
-Kusto (queries IcM/SafeFly using `service_name`).
-
-| Provider | Keys populated | Data source |
-|----------|---------------|-------------|
-| `Neo4jEvidenceProvider` | service_id, service_name, services_impacted, recent_incidents, recent_deployments | Neo4j graph |
-| `KustoEvidenceProvider` | open_icms, avg_mttm_minutes, historical_outages_180d, related_incidents, deployment_count_30d, deployment_stage_failures | Kusto (IcM, SafeFly) |
-
-Kusto queries are defined in `risk_scoring/kusto_allowlist.py`. Each query
-specifies a `source` field that maps to a cluster/database pair in
-`risk_scoring/config/kusto_sources.yaml`.
-
-## Project Structure
-
-```
-risk_scoring/          ← Core scoring engine (Python package)
-api/                   ← FastAPI HTTP interface
-approach2-using-existing-graph/  ← Neo4j setup, sample data, import scripts
-approach1-creating-knowlege-graph/  ← Archived: Azure Cosmos DB experiment
-utils/                 ← Archived: Terraform plan parser
-```
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full pipeline,
+data flow modes, and design decisions.
 
 ## Scoring Model
 
-13 deterministic factors covering:
-- Environment risk (production penalty)
-- Blast radius (services impacted, peer resources)
-- Incident history (outages, MTTM, recurrence)
-- Deployment signals (frequency, stage failures)
-- Change characteristics (destructive operations)
-- Dependency depth (artifacts, templates)
+14 deterministic factors (model version `0.1`) across six categories:
 
-Score range: 0–100. Levels: LOW (0–33), MEDIUM (34–66), HIGH (67–100).
+| Category | Factors | Max Points |
+|----------|---------|------------|
+| Environment risk | Production penalty | 20 |
+| Blast radius | Services, critical services, subscriptions | 50 |
+| Incident history | Outages, open IcMs, MTTM, recurrence | 37 |
+| Deployment signals | Frequency, stage failures | 25 |
+| Change characteristics | Destructive operations | 10 |
+| Dependency depth | Artifacts, peers, templates | 28 |
+
+Score range: 0–100 (capped). Levels: **LOW** (0–33), **MEDIUM** (34–66),
+**HIGH** (67–100).
+
+See [docs/SCORING_MODEL.md](docs/SCORING_MODEL.md) for all factor
+thresholds, evidence keys, and data sources.
 
 ## Development
 
 ```bash
-# Run tests
-python -m pytest risk_scoring/tests/
+# Run all tests (250 tests)
+python -m pytest risk_scoring/tests/ api/tests/ -v
 
 # Start FastAPI server
-uvicorn api.main:app --reload
+source .env && uvicorn api.main:app --reload
 
 # Start MCP server (for AI agents)
 python -m risk_scoring.mcp_server
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/VISION.md](docs/VISION.md) | North star, strategy, phases, success metrics |
+| [docs/SCORING_MODEL.md](docs/SCORING_MODEL.md) | All 14 scoring factors with thresholds and evidence keys |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Pipeline, data flow modes, design decisions, project structure |
+| [risk_scoring/canonical_change_model_v1.md](risk_scoring/canonical_change_model_v1.md) | Canonical change model schema (v1) |
+| [approach2-using-existing-graph/](approach2-using-existing-graph/) | Neo4j setup, sample data, import scripts |
 
 ## License
 

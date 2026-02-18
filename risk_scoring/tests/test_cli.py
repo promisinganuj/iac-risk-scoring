@@ -208,12 +208,14 @@ class TestMainValidation(unittest.TestCase):
         self.assertEqual(code, 1)
 
     @patch("risk_scoring.cli._resolve_data_source", return_value="kusto")
-    def test_kusto_without_service_name_errors(self, _rd):
-        """--data-source=kusto without --service-name should fail."""
-        code = main(
-            ["--resource-id", "res-1", "--environment", "prod", "--data-source", "kusto"]
-        )
-        self.assertEqual(code, 1)
+    def test_kusto_without_service_name_or_resource_id_errors(self, _rd):
+        """--data-source=kusto without --service-name and --resource-id should fail."""
+        # argparse rejects completely missing identity flags with SystemExit(2)
+        with self.assertRaises(SystemExit) as ctx:
+            main(
+                ["--environment", "prod", "--data-source", "kusto"]
+            )
+        self.assertEqual(ctx.exception.code, 2)
 
     @patch("risk_scoring.cli._resolve_data_source", return_value="neo4j")
     def test_neo4j_without_resource_id_errors(self, _rd):

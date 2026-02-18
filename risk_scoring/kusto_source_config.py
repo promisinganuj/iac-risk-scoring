@@ -22,6 +22,7 @@ from typing import Dict, Optional
 
 import yaml
 
+from risk_scoring.arg_client import ARGClient
 from risk_scoring.kusto_client import KustoClient, KustoConfig
 
 logger = logging.getLogger(__name__)
@@ -165,19 +166,27 @@ class KustoSourceRegistry:
             timeout_secs=self.timeout_secs,
         )
 
-    def get_client(self, source_name: str) -> KustoClient:
-        """Return a (lazily created) ``KustoClient`` for the named source.
+    def get_client(self, source_name: str):
+        """Return a lazily created client for the named source.
+
+        For the ``"arg"`` source, returns an ARGClient that queries
+        Azure Resource Graph via the ARM SDK.  For all other sources,
+        returns a KustoClient backed by the Azure Data Explorer SDK.
 
         Clients are cached so repeated calls for the same source reuse the
-        same SDK connection.
+        same connection.
         """
         if source_name not in self._clients:
-            cfg = self.get_config(source_name)
-            self._clients[source_name] = KustoClient(cfg)
-            logger.info(
-                "Created KustoClient for source %r → %s/%s",
-                source_name, cfg.cluster_url, cfg.database,
-            )
+            if source_name == "arg":
+                self._clients[source_name] = ARGClient()
+                logger.info("Created ARGClient for source 'arg'")
+            else:
+                cfg = self.get_config(source_name)
+                self._clients[source_name] = KustoClient(cfg)
+                logger.info(
+                    "Created KustoClient for source %r → %s/%s",
+                    source_name, cfg.cluster_url, cfg.database,
+                )
         return self._clients[source_name]
 
     def list_sources(self) -> list[str]:

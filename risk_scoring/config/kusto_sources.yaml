@@ -22,6 +22,9 @@ kusto_sources:
     cluster: https://safeflycluster.westus.kusto.windows.net
     database: safefly
 
+  # arg: handled by ARGClient (azure-mgmt-resourcegraph SDK), not Kusto.
+  # The KustoSourceRegistry returns an ARGClient when source == "arg".
+
   # ── Future sources (uncomment when queries are added) ──
   # ev2:
   #   cluster: https://ev2cluster.kusto.windows.net

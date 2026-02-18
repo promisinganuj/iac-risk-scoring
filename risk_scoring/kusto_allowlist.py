@@ -327,6 +327,14 @@ _SERVICE_ID_PARAM = ParamSpec(
     name="serviceId", kind="str", required=True, max_len=36
 )
 
+_SUBSCRIPTION_ID_PARAM = ParamSpec(
+    name="subscriptionId", kind="str", required=True, max_len=36
+)
+
+_RESOURCE_GROUP_NAME_PARAM = ParamSpec(
+    name="resourceGroupName", kind="str", required=True, max_len=256
+)
+
 KQL_ALLOWLIST["k10.service_subscriptions"] = KqlQuerySpec(
     query_id="k10.service_subscriptions",
     kql=(
@@ -404,5 +412,30 @@ KQL_ALLOWLIST["k12.service_repos"] = KqlQuerySpec(
     description=(
         "Get all source code repository URLs registered in Service Tree "
         "for a service via GetServicesMetadataValues()."
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Azure Resource Graph (ARG) evidence
+# ---------------------------------------------------------------------------
+
+KQL_ALLOWLIST["k13.arg_peer_resources"] = KqlQuerySpec(
+    query_id="k13.arg_peer_resources",
+    kql=(
+        "Resources\n"
+        "| where subscriptionId =~ {subscriptionId}\n"
+        "| where resourceGroup =~ {resourceGroupName}\n"
+        "| summarize peer_resource_count = count()\n"
+        "| take {take}"
+    ),
+    params=(_SUBSCRIPTION_ID_PARAM, _RESOURCE_GROUP_NAME_PARAM),
+    source="arg",
+    max_take=1,
+    default_take=1,
+    evidence_key="peer_resource_count",
+    description=(
+        "Count resources in the same resource group via ARG. "
+        "Provider excludes the changed resource when deriving peer count."
     ),
 )

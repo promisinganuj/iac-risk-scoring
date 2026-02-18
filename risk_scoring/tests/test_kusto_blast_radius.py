@@ -31,6 +31,8 @@ class FakeKustoClient:
         self.calls.append(kql)
         for pattern, rows in self._responses.items():
             if pattern in kql:
+                if isinstance(rows, Exception):
+                    raise rows
                 return rows
         return []
 
@@ -222,14 +224,46 @@ class TestCriticalServices(unittest.TestCase):
 
 
 class TestPeerResourceCount(unittest.TestCase):
-    """peer_resource_count should always be unknown in Kusto-only mode."""
+    """peer_resource_count should come from ARG when resource context exists."""
 
-    def _resolved(self, name: str = "Payments") -> ResolvedEntityRef:
+    @staticmethod
+    def _resource_ref() -> ResolvedEntityRef:
+        rid = (
+            "/subscriptions/00000000-0000-0000-0000-000000000123"
+            "/resourceGroups/rg-payments/providers/Microsoft.Web/sites/payments-api"
+        )
         return ResolvedEntityRef(
-            label="Service", resource_id=name, display_name=name
+            label="AzureResource", resource_id=rid, display_name="payments-api"
         )
 
-    def test_peer_resource_count_always_unknown(self):
+    def test_peer_resource_count_from_arg(self):
+        provider = KustoEvidenceProvider(
+            FakeKustoClient(
+                {
+                    **_SCALAR_ZEROS,
+                    "GetServicesByName": [
+                        {
+                            "ServiceId": "abc-123",
+                            "ServiceName": "Payments",
+                            "ServiceLevel": "3",
+                            "IsExternalFacing": False,
+                        }
+                    ],
+                    "GetSubscriptionsAssociatedWith": [],
+                    "GetServicesMetadataValues": [],
+                    "Resources": [{"peer_resource_count": 6}],
+                }
+            )
+        )
+        evidence: dict = {"service_name": "Payments"}
+        result = provider.populate(self._resource_ref(), evidence)
+
+        # ARG count includes the changed resource itself, provider subtracts 1.
+        self.assertEqual(evidence.get("peer_resource_count"), 5)
+        self.assertIn("peer_resource_count", result.populated_keys)
+        self.assertNotIn("peer_resource_count", result.unknown_keys)
+
+    def test_peer_resource_count_unknown_without_resource_context(self):
         provider = KustoEvidenceProvider(
             FakeKustoClient(
                 {
@@ -248,7 +282,35 @@ class TestPeerResourceCount(unittest.TestCase):
             )
         )
         evidence: dict = {"service_name": "Payments"}
-        result = provider.populate(self._resolved(), evidence)
+        resolved = ResolvedEntityRef(
+            label="Service", resource_id="Payments", display_name="Payments"
+        )
+        result = provider.populate(resolved, evidence)
+
+        self.assertIsNone(evidence.get("peer_resource_count"))
+        self.assertIn("peer_resource_count", result.unknown_keys)
+
+    def test_peer_resource_count_unknown_on_arg_failure(self):
+        provider = KustoEvidenceProvider(
+            FakeKustoClient(
+                {
+                    **_SCALAR_ZEROS,
+                    "GetServicesByName": [
+                        {
+                            "ServiceId": "abc-123",
+                            "ServiceName": "Payments",
+                            "ServiceLevel": "3",
+                            "IsExternalFacing": False,
+                        }
+                    ],
+                    "GetSubscriptionsAssociatedWith": [],
+                    "GetServicesMetadataValues": [],
+                    "Resources": RuntimeError("arg failed"),
+                }
+            )
+        )
+        evidence: dict = {"service_name": "Payments"}
+        result = provider.populate(self._resource_ref(), evidence)
 
         self.assertIsNone(evidence.get("peer_resource_count"))
         self.assertIn("peer_resource_count", result.unknown_keys)
@@ -430,6 +492,46 @@ class TestKustoProviderPipeline(unittest.TestCase):
         self.assertEqual(
             factors["resource.peer_impact"].status, "unknown"
         )  # no ARG
+
+    def test_arg_peer_count_contributes_peer_impact_points(self):
+        provider = KustoEvidenceProvider(
+            FakeKustoClient(
+                {
+                    **_SCALAR_ZEROS,
+                    "GetServicesByName": [
+                        {
+                            "ServiceId": "abc-123",
+                            "ServiceName": "Payments",
+                            "ServiceLevel": "3",
+                            "IsExternalFacing": False,
+                        }
+                    ],
+                    "GetSubscriptionsAssociatedWith": [],
+                    "GetServicesMetadataValues": [],
+                    "Resources": [{"peer_resource_count": 11}],
+                }
+            )
+        )
+
+        resolved = ResolvedEntityRef(
+            label="AzureResource",
+            resource_id=(
+                "/subscriptions/00000000-0000-0000-0000-000000000123"
+                "/resourceGroups/rg-payments/providers/Microsoft.Web/sites/payments-api"
+            ),
+            display_name="payments-api",
+        )
+
+        evidence: dict = {"service_name": "Payments"}
+        provider.populate(resolved, evidence)
+
+        change = ChangeContext.create(environment="prod")
+        result = score_change(change, evidence)
+        factors = {f.factor_id: f for f in result.factors}
+
+        self.assertEqual(evidence["peer_resource_count"], 10)
+        self.assertEqual(factors["resource.peer_impact"].points, 8)
+        self.assertEqual(factors["resource.peer_impact"].status, "hit")
 
     def test_non_critical_service_no_extra_points(self):
         """Internal, low-level service should NOT add critical points."""

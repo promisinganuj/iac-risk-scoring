@@ -305,10 +305,10 @@ def main(argv: Optional[list] = None) -> int:
             args.service_name = resolved_service
 
         # --- Validate flag combinations ---
-        if data_source == "kusto" and not args.service_name:
+        if data_source == "kusto" and not args.service_name and not args.resource_id:
             print(
-                "Error: --data-source=kusto requires --service-name or --repo-uri "
-                "(Kusto queries need a service name to match OwningTenantName)",
+                "Error: --data-source=kusto requires --service-name, --repo-uri, "
+                "or --resource-id (ARM resource ID enables ARG queries)",
                 file=sys.stderr,
             )
             return 1
@@ -402,9 +402,11 @@ def _run_providers(args, data_source, change_context, report_id):
         # Kusto-only or service-name supplied: build a synthetic resolved ref
         # so providers can use service_name in evidence dict.
         resource_id = args.resource_id or args.service_name or "unknown"
-        display = args.service_name
+        display = args.service_name or args.resource_id
         label = "Service"
-        if args.repo_uri and not args.resource_id:
+        if args.resource_id and not args.service_name:
+            label = "AzureResource"
+        elif args.repo_uri and not args.resource_id:
             label = "Repository"
         resolved = ResolvedEntityRef(
             label=label,

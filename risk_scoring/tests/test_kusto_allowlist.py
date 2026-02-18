@@ -16,6 +16,8 @@ from risk_scoring.kusto_allowlist import (
 
 # A valid service name for testing (matches IcM OwningTenantName).
 _VALID_SERVICE_NAME = "Azure App Service (Payments)"
+_VALID_SUBSCRIPTION_ID = "00000000-0000-0000-0000-000000000123"
+_VALID_RESOURCE_GROUP = "rg-payments-prod"
 
 
 # ============================================================
@@ -70,6 +72,19 @@ class TestValidateKqlParams:
         q = get_kql_query("k1.open_icms")
         with pytest.raises(ParameterValidationError, match="must be a string"):
             validate_kql_params(q, {"serviceName": 12345})
+
+    def test_valid_arg_params(self) -> None:
+        q = get_kql_query("k13.arg_peer_resources")
+        result = validate_kql_params(
+            q,
+            {
+                "subscriptionId": _VALID_SUBSCRIPTION_ID,
+                "resourceGroupName": _VALID_RESOURCE_GROUP,
+            },
+        )
+        assert result["subscriptionId"] == _VALID_SUBSCRIPTION_ID
+        assert result["resourceGroupName"] == _VALID_RESOURCE_GROUP
+        assert result["take"] == 1
 
 
 class TestTakeValidation:
@@ -173,6 +188,22 @@ class TestBuildKql:
         assert "ago(90d)" in kql
         assert "'Abandoned', 'Rejected'" in kql
         assert "deployment_stage_failures = count()" in kql
+
+    def test_k13_arg_peer_resources(self) -> None:
+        q = get_kql_query("k13.arg_peer_resources")
+        assert q.source == "arg"
+        params = validate_kql_params(
+            q,
+            {
+                "subscriptionId": _VALID_SUBSCRIPTION_ID,
+                "resourceGroupName": _VALID_RESOURCE_GROUP,
+            },
+        )
+        kql = build_kql(q, params)
+        assert "Resources" in kql
+        assert f"subscriptionId =~ '{_VALID_SUBSCRIPTION_ID}'" in kql
+        assert f"resourceGroup =~ '{_VALID_RESOURCE_GROUP}'" in kql
+        assert "peer_resource_count = count()" in kql
 
     def test_unsafe_characters_rejected(self) -> None:
         q = get_kql_query("k1.open_icms")

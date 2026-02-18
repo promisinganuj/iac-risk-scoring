@@ -61,6 +61,7 @@ class KustoEvidenceProvider:
             self._registry = None
             self._client = client_or_registry
 
+
     @property
     def name(self) -> str:
         return "kusto-icm"
@@ -97,8 +98,8 @@ class KustoEvidenceProvider:
         # We need a service name to query IcM (matches OwningTenantName).
         service_name = evidence.get("service_name")
         if not service_name or not isinstance(service_name, str) or not service_name.strip():
-            # No service context — mark all our keys as unknown.
-            all_keys = list(self._QUERY_MAP.values()) + [
+            # No service context — mark service-dependent keys as unknown.
+            service_keys = list(self._QUERY_MAP.values()) + [
                 "service_tree_id",
                 "service_subscriptions",
                 "subscription_count",
@@ -106,15 +107,33 @@ class KustoEvidenceProvider:
                 "repo_count",
                 "services_impacted",
                 "critical_services",
-                "peer_resource_count",
             ]
-            for ek in all_keys:
+            for ek in service_keys:
                 evidence.setdefault(ek, None)
                 unknowns.append(ek)
+
+            # peer_resource_count can still be resolved from ARG if we
+            # have an ARM resource ID (no service name needed).
+            subscription_id, resource_group_name = self._parse_arm_resource_id(
+                str(resolved.resource_id or "")
+            )
+            if subscription_id and resource_group_name:
+                self._resolve_peer_resource_count(
+                    subscription_id,
+                    resource_group_name,
+                    evidence,
+                    queries,
+                    populated,
+                    unknowns,
+                )
+            else:
+                evidence.setdefault("peer_resource_count", None)
+                unknowns.append("peer_resource_count")
+
             return ProviderResult(
                 provider_name=self.name,
-                queries=(),
-                populated_keys=(),
+                queries=tuple(queries),
+                populated_keys=tuple(sorted(populated)),
                 unknown_keys=tuple(sorted(unknowns)),
             )
 
@@ -155,7 +174,7 @@ class KustoEvidenceProvider:
 
         # --- Phase 5: Blast radius from Service Tree joins ---
         self._compute_blast_radius(
-            service_name, service_meta, evidence, populated, unknowns
+            resolved, service_name, service_meta, evidence, queries, populated, unknowns
         )
 
         return ProviderResult(
@@ -362,23 +381,24 @@ class KustoEvidenceProvider:
 
     def _compute_blast_radius(
         self,
+        resolved: ResolvedEntityRef,
         service_name: Optional[str],
         service_meta: Optional["KustoEvidenceProvider._ServiceMeta"],
         evidence: Dict[str, Any],
+        queries: List[QueryRun],
         populated: List[str],
         unknowns: List[str],
     ) -> None:
-        """Derive blast radius evidence from Service Tree data.
+        """Derive blast radius evidence from Service Tree and ARG data.
 
         Evidence keys populated:
         - ``services_impacted``: 1 when service context is available, 0
-          otherwise.  In Kusto-only mode we resolve a single service,
+          otherwise. In Kusto-only mode we resolve a single service,
           so multi-service blast radius is not available.
         - ``critical_services``: list of service names whose ServiceLevel
           is high or that are external-facing (from k7 metadata).
-        - ``peer_resource_count``: always None — requires Azure Resource
-          Graph which is not a standard Kusto source.  Gracefully
-          degrades to "unknown" in scoring.
+        - ``peer_resource_count``: resolved via ARG when resource context is
+          available (subscription + resource group); otherwise unknown.
         """
         # --- services_impacted ---
         if service_name and isinstance(service_name, str) and service_name.strip():
@@ -415,14 +435,105 @@ class KustoEvidenceProvider:
             unknowns.append("critical_services")
 
         # --- peer_resource_count ---
-        # Not available from Service Tree — requires ARM / Azure Resource Graph.
-        # Gracefully degrade: leave as unknown so scoring assigns 0 points.
-        evidence.setdefault("peer_resource_count", None)
-        unknowns.append("peer_resource_count")
+        subscription_id = evidence.get("subscription_id")
+        resource_group_name = evidence.get("resource_group_name")
+
+        if not (isinstance(subscription_id, str) and subscription_id.strip()):
+            subscription_id = None
+        if not (isinstance(resource_group_name, str) and resource_group_name.strip()):
+            resource_group_name = None
+
+        if subscription_id is None or resource_group_name is None:
+            rid = evidence.get("resource_id") or resolved.resource_id
+            parsed_sub, parsed_rg = self._parse_arm_resource_id(str(rid or ""))
+            subscription_id = subscription_id or parsed_sub
+            resource_group_name = resource_group_name or parsed_rg
+
+        if subscription_id and resource_group_name:
+            self._resolve_peer_resource_count(
+                subscription_id,
+                resource_group_name,
+                evidence,
+                queries,
+                populated,
+                unknowns,
+            )
+        else:
+            evidence.setdefault("peer_resource_count", None)
+            unknowns.append("peer_resource_count")
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _parse_arm_resource_id(resource_id: str) -> tuple[Optional[str], Optional[str]]:
+        """Extract (subscription_id, resource_group_name) from an ARM resource ID."""
+        if not isinstance(resource_id, str) or not resource_id.strip():
+            return None, None
+
+        parts = [p for p in resource_id.strip().split("/") if p]
+        subscription_id: Optional[str] = None
+        resource_group_name: Optional[str] = None
+
+        for index, part in enumerate(parts[:-1]):
+            low = part.lower()
+            if low == "subscriptions":
+                subscription_id = parts[index + 1]
+            elif low == "resourcegroups":
+                resource_group_name = parts[index + 1]
+
+        return subscription_id, resource_group_name
+
+    def _resolve_peer_resource_count(
+        self,
+        subscription_id: str,
+        resource_group_name: str,
+        evidence: Dict[str, Any],
+        queries: List[QueryRun],
+        populated: List[str],
+        unknowns: List[str],
+    ) -> None:
+        """Resolve peer_resource_count from ARG (k13)."""
+        try:
+            spec = get_kql_query("k13.arg_peer_resources")
+            params = {
+                "subscriptionId": subscription_id,
+                "resourceGroupName": resource_group_name,
+            }
+            validated = validate_kql_params(spec, params)
+            kql = build_kql(spec, validated)
+            client = self._client_for(spec.source)
+            rows = client.execute(kql)
+
+            qr = QueryRun(
+                query_id="k13.arg_peer_resources",
+                params={
+                    "subscriptionId": subscription_id,
+                    "resourceGroupName": resource_group_name,
+                },
+                row_count=len(rows),
+                sample_rows=tuple(rows[:5]),
+            )
+            queries.append(qr)
+
+            if rows and len(rows) > 0:
+                value = rows[0].get("peer_resource_count")
+                if value is not None:
+                    total_in_rg = int(value)
+                    evidence["peer_resource_count"] = max(total_in_rg - 1, 0)
+                    populated.append("peer_resource_count")
+                    return
+
+            evidence.setdefault("peer_resource_count", None)
+            unknowns.append("peer_resource_count")
+
+        except (KustoQueryError, ValueError, TypeError, Exception) as exc:
+            logger.warning(
+                "k13.arg_peer_resources failed: %s", exc, exc_info=True
+            )
+            evidence.setdefault("peer_resource_count", None)
+            unknowns.append("peer_resource_count")
 
     def _run_scalar_query(
         self, query_id: str, service_name: str
@@ -454,8 +565,14 @@ class KustoEvidenceProvider:
                     return None, qr
         return None, qr
 
-    def _client_for(self, source: str) -> KustoClient:
-        """Return the KustoClient for the given logical source name."""
+    def _client_for(self, source: str):
+        """Return the client for the given logical source name.
+
+        When using a registry, the registry handles source dispatch
+        (including returning an ARGClient for the "arg" source).
+        When using a plain client (single-client mode / tests), the
+        injected client is used for all sources.
+        """
         if self._registry is not None:
             return self._registry.get_client(source)
         assert self._client is not None

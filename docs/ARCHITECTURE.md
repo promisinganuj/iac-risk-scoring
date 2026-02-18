@@ -80,14 +80,16 @@ earlier ones. The recommended order:
    - Phase 2: k7 service tree lookup → ServiceId + metadata
    - Phase 3: k10 subscription mapping using ServiceId from phase 2
    - Phase 4: k12 source repos enrichment using ServiceId from phase 2
-   - Phase 5: Blast radius derivation from Service Tree metadata
+   - Phase 5: Blast radius derivation from Service Tree + ARG
      (`services_impacted`, `critical_services` from k7 ServiceLevel/
-     IsExternalFacing; `peer_resource_count` marked unknown)
+     IsExternalFacing; `peer_resource_count` from k13 ARG query when
+     resource context is available)
 
    > **Note:** In Kusto-only mode, `services_impacted` is always 1 (single
    > service resolution). `critical_services` is derived from k7's
    > `ServiceLevel` and `IsExternalFacing` fields. `peer_resource_count`
-   > requires Azure Resource Graph — see `iac-risk-scoring-8to`.
+   > requires resource-level context (subscription + resource group) and
+   > otherwise remains unknown.
 
 ### 3. Scoring
 
@@ -108,7 +110,7 @@ Both use deterministic key ordering.
 ```
 CLI: --service-name "My Service" --data-source kusto --environment prod
      (or --repo-uri "https://dev.azure.com/org/proj/_git/repo" → k11 → service)
-     (or --repo-uri "https://dev.azure.com/org/proj/_git/repo" → k11 → service)
+     (or --resource-id "/subscriptions/.../resourceGroups/.../..." → ARG only)
  │
  ▼
 ResolvedEntityRef(display_name="My Service")
@@ -119,11 +121,18 @@ KustoEvidenceProvider
  ├─ Phase 2: k7 (Service Tree) → ServiceId + metadata
  ├─ Phase 3: k10 (subscriptions)
  ├─ Phase 4: k12 (source repos)
- └─ Phase 5: blast radius (services_impacted, critical_services)
+ └─ Phase 5: blast radius (services_impacted, critical_services,
+              peer_resource_count via k13 ARG)
  │
  ▼
 score_change() → ScoreResult → report
 ```
+
+> **Resource-ID-only mode:** When `--resource-id` is an ARM resource ID and
+> no `--service-name` is provided, the provider skips service-dependent
+> queries (IcM, SafeFly, Service Tree) and only runs k13 against Azure
+> Resource Graph to populate `peer_resource_count`. All other factors are
+> marked unknown.
 
 ### Hybrid (Neo4j + Kusto)
 
@@ -231,16 +240,17 @@ risk_scoring/              Core scoring engine (Python package)
 ├── evidence_provider.py   EvidenceProvider protocol + run_providers()
 ├── kusto_evidence_provider.py   Kusto-backed provider (IcM, SafeFly, Service Tree)
 ├── neo4j_evidence_provider.py   Neo4j-backed provider (graph blast radius)
-├── kusto_allowlist.py     Allowlisted KQL queries (k1–k12)
+├── kusto_allowlist.py     Allowlisted KQL queries (k1–k13)
 ├── evidence_allowlist.py  Allowlisted Cypher queries
 ├── kusto_client.py        Azure Data Explorer SDK wrapper
-├── kusto_source_config.py KustoSourceRegistry (YAML → cluster routing)
+├── arg_client.py          Azure Resource Graph SDK wrapper (ARG → peer count)
+├── kusto_source_config.py KustoSourceRegistry (YAML → cluster routing, ARG dispatch)
 ├── config/
 │   └── kusto_sources.yaml Cluster/database mappings per source
 ├── reporting.py           JSON + Markdown report generation
 ├── cli.py                 CLI entry point
 ├── mcp_server.py          MCP server for AI agents
-└── tests/                 ~270 tests
+└── tests/                 ~306 tests
 
 api/                       FastAPI HTTP interface
 ├── main.py                /assess, /assess-pr, /health endpoints

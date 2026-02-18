@@ -53,7 +53,7 @@ python -m risk_scoring [identity flags] --environment <env> [options]
 | `--data-source` | Behaviour |
 |-----------------|-----------|
 | `auto` *(default)* | Detect available backends from env vars / config |
-| `kusto` | IcM + SafeFly + Service Tree evidence via Kusto only (requires `--service-name` or `--repo-uri`) |
+| `kusto` | IcM + SafeFly + Service Tree evidence via Kusto only (requires `--service-name`, `--repo-uri`, or `--resource-id`) |
 | `neo4j` | Graph-based evidence only |
 | `hybrid` | Neo4j for entity resolution + graph evidence, then Kusto for IcM/SafeFly/Service Tree |
 
@@ -79,8 +79,9 @@ python -m risk_scoring --resource-id "res-alpha-app" --environment prod \
 python -m risk_scoring --repo-uri "https://dev.azure.com/org/project/_git/payments" \
     --environment prod --data-source kusto
 
-# Repo URI (resolves to service via Service Tree k11 lookup)
-python -m risk_scoring --repo-uri "https://dev.azure.com/org/project/_git/payments" \
+# Resource-ID only (ARG peer count — no service name needed)
+python -m risk_scoring \
+    --resource-id "/subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.Web/sites/<app>" \
     --environment prod --data-source kusto
 
 # Verbose logging

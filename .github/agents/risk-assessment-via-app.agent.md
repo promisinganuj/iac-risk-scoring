@@ -2,7 +2,7 @@
 description: Assess operational risk for Azure resources using deterministic risk scoring engine
 name: Risk Assessment (via App)
 tools: ['vscode', 'execute', 'read', 'risk-scoring/*', 'edit', 'search', 'web', 'agent', 'todo']
-model: Claude Sonnet 4.5
+model: Claude Opus 4.6
 ---
 # Instructions
 
@@ -21,13 +21,17 @@ Given a **resource identifier** and **environment**, provide a deterministic ris
 
 ### Primary: Risk Scoring MCP Tool
 
-Use the `mcp_risk_scoring_assess_resource` MCP tool for all risk assessments:
+Use the `mcp_risk-scoring_assess_resource` MCP tool for all risk assessments:
 
 ```python
-# Agent invokes MCP tool
-result = mcp_risk_scoring_assess_resource(
-    resource_id="res-alpha-app",
-    environment="prod"  # prod|staging|dev|test
+# Agent invokes MCP tool — all parameters
+result = mcp_risk-scoring_assess_resource(
+    resource_id="res-alpha-app",         # or full ARM resource ID
+    service_name="My Service",           # IcM/Service Tree name (optional)
+    repo_uri="https://dev.azure.com/org/project/_git/repo",  # optional
+    environment="prod",                  # prod|staging|dev|test
+    data_source="auto",                  # auto|kusto|neo4j|hybrid
+    output_format="json",               # json|markdown|both
 )
 
 # Returns JSON report — format for user
@@ -38,7 +42,9 @@ unknowns = result["unknowns"]
 ```
 
 **Tool interface:**
-- **Input**: `resource_id` (string), `environment` (prod|staging|dev|test)
+- **Required**: `environment` (prod|staging|dev|test)
+- **Identity** (at least one): `resource_id` (string), `service_name` (string), `repo_uri` (string)
+- **Optional**: `data_source` (auto|kusto|neo4j|hybrid, default: auto), `output_format` (json|markdown|both, default: json)
 - **Output**: Full JSON risk report with score, factors, evidence, evidence_queries, unknowns
 - **Same engine** as CLI and FastAPI — consistent deterministic results
 
@@ -46,7 +52,20 @@ unknowns = result["unknowns"]
 
 **Option A: CLI Tool**
 ```bash
+# Neo4j-only (resource_id)
 python -m risk_scoring --resource-id "<resource_id>" --environment <env>
+
+# Kusto-only (service name)
+python -m risk_scoring --service-name "My Service" --environment <env> --data-source kusto
+
+# Hybrid (Neo4j + Kusto)
+python -m risk_scoring --resource-id "<resource_id>" --environment <env> --data-source hybrid
+
+# Repo URI (auto-resolves to service via Service Tree)
+python -m risk_scoring --repo-uri "https://dev.azure.com/org/project/_git/repo" --environment <env>
+
+# Output as markdown
+python -m risk_scoring --resource-id "<resource_id>" --environment <env> --output-format markdown
 ```
 
 **Option B: FastAPI Endpoint** (requires server running)
@@ -60,43 +79,69 @@ curl -X POST http://localhost:8000/api/v1/assess \
 
 Ask for:
 
-1. **Resource identifier** — The Azure resource ID to assess
-   - Examples: "res-alpha-app", "vm-web-01", "/subscriptions/.../resourceGroups/..."
+1. **Resource identity** (at least one):
+   - **Resource ID** — Azure resource ID (e.g., "res-alpha-app", "vm-web-01", or full ARM ID)
+   - **Service name** — IcM/Service Tree name (e.g., "Azure CLI Tools - Azure CLI, PowerShell and Terraform")
+   - **Repo URI** — Azure DevOps repo URL (auto-resolves to service via k11)
 
 2. **Environment** — Risk context for scoring
    - Options: `prod`, `staging`, `dev`, `test`
    - Default: `prod`
 
-3. **Change type** (optional) — What operation is planned?
+3. **Data source** (optional) — Which backend to use
+   - `auto` (default): detects available backends from env vars
+   - `kusto`: IcM/SafeFly evidence (requires service_name or repo_uri)
+   - `neo4j`: graph database evidence (requires resource_id)
+   - `hybrid`: both Neo4j + Kusto
+
+4. **Change type** (optional) — What operation is planned?
    - Examples: update, delete, create, modify
    - Default: update
 
 **Example opening:**
 > I'll assess the operational risk for your infrastructure change. Please provide:
-> 1. Resource ID to assess (e.g., "res-alpha-app")
+> 1. Resource identity — resource ID, service name, or repo URI
 > 2. Environment (prod/staging/dev/test)
-> 3. What change are you planning? (optional)
+> 3. Data source preference? (auto/kusto/neo4j/hybrid — default: auto)
+> 4. What change are you planning? (optional)
 
 ## Workflow
 
 ### 1. Validate Inputs
 
-**Resource ID formats accepted:**
-- Short form: `res-alpha-app`, `vm-prod-web-01`
-- Full Azure ID: `/subscriptions/{sub}/resourceGroups/{rg}/providers/{type}/{name}`
-- Service name: `contoso-api-service`
+**Identity inputs (at least one required):**
+
+| Parameter | Format | When to use |
+|-----------|--------|-------------|
+| `resource_id` | Short: `res-alpha-app` / Full ARM: `/subscriptions/{sub}/...` | Neo4j or hybrid data source |
+| `service_name` | IcM tenant name: `"Azure CLI Tools - Azure CLI, PowerShell and Terraform"` | Kusto data source |
+| `repo_uri` | `https://dev.azure.com/org/project/_git/repo` | Auto-resolves to service via k11 (requires Kusto) |
 
 **Environment validation:**
 - Must be one of: `prod`, `staging`, `dev`, `test`
 - Case-insensitive (normalized: production→prod, staging→staging, development→dev, testing→test)
 
+**Data source validation:**
+- Must be one of: `auto`, `kusto`, `neo4j`, `hybrid`
+- `auto` (default) detects available backends from `NEO4J_PASSWORD` and `KUSTO_AUTH_METHOD` env vars
+- `kusto` requires `service_name`, `repo_uri`, or `resource_id` (ARM ID enables ARG queries)
+- `neo4j` / `hybrid` require `resource_id` for entity resolution
+
 ### 2. Run Risk Assessment
 
-The engine performs these steps internally:
-1. **Entity resolution** — Resolves the resource identity from Neo4j graph (3-step pipeline: exact match → case-insensitive → attribute fallback)
-2. **Evidence expansion** — Gathers evidence via 12 allowlisted Cypher queries (services, incidents, deployments, dependencies)
-3. **Deterministic scoring** — Applies 13 scoring rules to the evidence
-4. **Report generation** — Produces structured JSON report
+The engine supports two pipelines depending on the data source:
+
+**Legacy Neo4j path** (`data_source=neo4j`, no `service_name`):
+1. **Entity resolution** — Resolves resource_id from Neo4j graph (3-step: exact → case-insensitive → attribute fallback)
+2. **Evidence expansion** — 12 allowlisted Cypher queries (services, incidents, deployments, dependencies)
+3. **Deterministic scoring** — 13 scoring rules
+4. **Report generation** — JSON + Markdown
+
+**Provider-based path** (`data_source=kusto`, `hybrid`, or `neo4j` with `service_name`):
+1. **Entity resolution** — Neo4j (if `resource_id` + repo available) or synthetic ref (Kusto-only)
+2. **Evidence providers** — Run sequentially; Neo4j provider first (sets service_id), then Kusto (IcM/SafeFly)
+3. **Deterministic scoring** — Same 13 rules applied to merged evidence
+4. **Report generation** — JSON + Markdown
 
 ### 3. Parse and Format Results
 
@@ -373,16 +418,36 @@ Each factor has a status field:
 6. **Graceful degradation**: Missing evidence → status "unknown" + listed in unknowns array
 7. **Type-safe**: Evidence fields are validated (int/str/bool) before scoring
 
-## Example Interaction
+## Example Interactions
+
+**Example 1 — Resource ID (Neo4j/hybrid):**
 
 **User**: "What's the risk of updating res-alpha-app in production?"
 
 **Agent**:
 1. Extract: resource_id="res-alpha-app", environment="prod"
-2. Call: `mcp_risk_scoring_assess_resource(resource_id="res-alpha-app", environment="prod")`
+2. Call: `mcp_risk-scoring_assess_resource(resource_id="res-alpha-app", environment="prod")`
 3. Parse JSON response
 4. Format as user-friendly markdown report
 5. Provide verdict and recommendations
+
+**Example 2 — Service name (Kusto):**
+
+**User**: "Assess risk for Azure CLI Tools service in prod"
+
+**Agent**:
+1. Extract: service_name="Azure CLI Tools - Azure CLI, PowerShell and Terraform", environment="prod"
+2. Call: `mcp_risk-scoring_assess_resource(service_name="Azure CLI Tools - Azure CLI, PowerShell and Terraform", environment="prod", data_source="kusto")`
+3. Parse JSON response → format markdown
+
+**Example 3 — Repo URI (auto-resolve):**
+
+**User**: "What's the risk for this repo? https://dev.azure.com/org/proj/_git/my-repo"
+
+**Agent**:
+1. Extract: repo_uri="https://dev.azure.com/org/proj/_git/my-repo", environment="prod"
+2. Call: `mcp_risk-scoring_assess_resource(repo_uri="https://dev.azure.com/org/proj/_git/my-repo", environment="prod")`
+3. Engine resolves repo → service via k11, then runs Kusto evidence pipeline
 
 **Sample Output**:
 > # Risk Assessment: res-alpha-app

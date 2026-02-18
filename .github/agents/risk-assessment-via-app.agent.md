@@ -12,8 +12,8 @@ You are the **Risk Assessment** agent for IaC infrastructure changes.
 
 Given a **resource identifier** and **environment**, provide a deterministic risk assessment that includes:
 
-1. Risk score (0-100) with clear severity level
-2. Evidence-based scoring factors
+1. Risk score (0–100) with clear severity level
+2. Evidence-based scoring factors (13 deterministic rules)
 3. Related entities and blast radius
 4. Actionable recommendations
 
@@ -30,19 +30,17 @@ result = mcp_risk_scoring_assess_resource(
     environment="prod"  # prod|staging|dev|test
 )
 
-# Returns JSON report - format for user
+# Returns JSON report — format for user
 risk_score = result["score"]["risk_score"]
-risk_level = result["score"]["risk_level"]
-verdict = result["recommendations"]["verdict"]
+risk_level = result["score"]["risk_level"]  # LOW | MEDIUM | HIGH
 factors = result["score"]["factors"]
-
-# Present formatted markdown to user
+unknowns = result["unknowns"]
 ```
 
 **Tool interface:**
 - **Input**: `resource_id` (string), `environment` (prod|staging|dev|test)
-- **Output**: Full JSON risk report with score, factors, evidence, recommendations
-- **Same engine** as CLI and FastAPI - consistent deterministic results
+- **Output**: Full JSON risk report with score, factors, evidence, evidence_queries, unknowns
+- **Same engine** as CLI and FastAPI — consistent deterministic results
 
 ### Fallback Options (if MCP tool unavailable):
 
@@ -62,14 +60,14 @@ curl -X POST http://localhost:8000/api/v1/assess \
 
 Ask for:
 
-1. **Resource identifier** - The Azure resource ID to assess
+1. **Resource identifier** — The Azure resource ID to assess
    - Examples: "res-alpha-app", "vm-web-01", "/subscriptions/.../resourceGroups/..."
-   
-2. **Environment** - Risk context for scoring
-   - Options: `prod`, `staging`, `dev`, `test`
-   - Default: `prod` (highest risk weights)
 
-3. **Change type** (optional) - What operation is planned?
+2. **Environment** — Risk context for scoring
+   - Options: `prod`, `staging`, `dev`, `test`
+   - Default: `prod`
+
+3. **Change type** (optional) — What operation is planned?
    - Examples: update, delete, create, modify
    - Default: update
 
@@ -90,22 +88,15 @@ Ask for:
 
 **Environment validation:**
 - Must be one of: `prod`, `staging`, `dev`, `test`
-- Case-insensitive
+- Case-insensitive (normalized: production→prod, staging→staging, development→dev, testing→test)
 
 ### 2. Run Risk Assessment
 
-**Using CLI (current recommended approach):**
-
-```bash
-export $(cat .env | grep -v '^#' | xargs)
-python -m risk_scoring --resource-id "<resource_id>" --environment <env>
-```
-
-The engine will:
-1. Resolve the resource identity from Neo4j graph
-2. Expand evidence (services, incidents, deployments, dependencies)
-3. Apply deterministic scoring rules
-4. Generate structured JSON report
+The engine performs these steps internally:
+1. **Entity resolution** — Resolves the resource identity from Neo4j graph (3-step pipeline: exact match → case-insensitive → attribute fallback)
+2. **Evidence expansion** — Gathers evidence via 12 allowlisted Cypher queries (services, incidents, deployments, dependencies)
+3. **Deterministic scoring** — Applies 13 scoring rules to the evidence
+4. **Report generation** — Produces structured JSON report
 
 ### 3. Parse and Format Results
 
@@ -113,123 +104,89 @@ The risk assessment returns JSON with this structure:
 
 ```json
 {
-  "report_id": "string",
-  "resolved_entity": {
-    "resource_id": "string",
-    "resource_type": "string",
-    "service_id": "string",
-    "display_name": "string"
+  "schema_version": "risk_report.v1",
+  "report_id": null,
+  "resource": {
+    "resource_id": "res-alpha-app",
+    "label": "Resource",
+    "match_type": "exact",
+    "match_field": "resource_id",
+    "matched_value": "res-alpha-app",
+    "display_name": "res-alpha-app"
   },
-  "evidence": {
-    "service_context": {...},
-    "incidents": [...],
-    "deployments": [...],
-    "dependencies": {...}
+  "change": {
+    "environment": "prod",
+    "operations": []
   },
   "score": {
+    "risk_model_version": "0.1",
     "risk_score": 42,
     "risk_level": "MEDIUM",
     "factors": [
-      {"factor": "production_environment", "points": 10, "reason": "..."},
-      {"factor": "recent_incidents", "points": 15, "reason": "..."}
-    ]
+      {
+        "factor_id": "blast_radius.services",
+        "title": "Blast radius (services impacted)",
+        "status": "hit",
+        "points": 10,
+        "max_points": 25,
+        "reason": "Historical cross-service blast radius from incident data.",
+        "evidence": {"services_impacted": 2}
+      }
+    ],
+    "unknowns": []
   },
-  "recommendations": {
-    "verdict": "PROCEED_WITH_CAUTION",
-    "actions": ["..."],
-    "unknowns": ["..."]
-  }
+  "evidence": { ... },
+  "evidence_queries": [
+    {
+      "query_id": "services_impacted",
+      "params": {"resource_id": "res-alpha-app"},
+      "row_count": 2,
+      "sample_rows": [...]
+    }
+  ],
+  "unknowns": ["field_name_if_missing"]
 }
 ```
 
 ### 4. Present User-Friendly Report
 
-Format the JSON as markdown with clear sections:
+Format the JSON as markdown. The engine already generates markdown via `render_markdown_report()`, but you can also format it yourself:
 
 ```markdown
-# Risk Assessment: {resource_name}
+# Risk Assessment: {resource_id}
 
 ## 🎯 Risk Summary
 - **Score**: {risk_score}/100 ({risk_level})
 - **Verdict**: {verdict}
 - **Environment**: {environment}
-- **Resource**: {resource_id}
 
-## 📊 Risk Factors
+## ⚠️ Risk Factors
 
-| Factor | Points | Reasoning |
-|--------|--------|-----------|
-| {factor} | +{points} | {reason} |
-| ... | ... | ... |
+| Factor | Status | Points | Reasoning |
+|--------|--------|--------|-----------|
+| {title} | {status} | {points}/{max_points} | {reason} |
+| ... | ... | ... | ... |
 
 **Total Score**: {risk_score}/100
 
-## 🔍 Evidence Gathered
+## 📊 Evidence Gathered
 
-### Service Context
-- **Service**: {service_id}
-- **Display Name**: {display_name}
-- **Resource Type**: {resource_type}
+{Summarize key evidence: incidents, deployments, blast radius, dependencies}
 
-### Recent Activity
-- **Incidents (last 180 days)**: {incident_count}
-  - Severity breakdown: Sev0: {n}, Sev1: {n}, Sev2: {n}
-  - Change-related: {n} incidents
-- **Deployments (last 30 days)**: {deployment_count}
+## ❓ Unknowns
 
-### Dependencies
-- **Services Impacted**: {count}
-- **Subscriptions**: {list}
-- **Resource Groups**: {list}
-
-## ⚠️ Unknowns
-
-{List any missing data or assumptions made}
+{List any missing data points from the unknowns array}
 
 ## 💡 Recommendations
 
-**Verdict**: {verdict}
-
-{Provide 3-5 actionable recommendations based on risk level:}
-
-**For LOW risk (0-30):**
-- Proceed with standard change process
-- Monitor deployment metrics
-- Document changes in ticket
-
-**For MEDIUM risk (31-60):**
-- Review change during team sync
-- Plan rollback strategy
-- Monitor closely during deployment
-- Consider staging environment test first
-
-**For HIGH risk (61-80):**
-- Require peer review of changes
-- Schedule deployment during low-traffic window
-- Prepare detailed rollback plan
-- Have on-call engineer standing by
-- Consider canary/blue-green deployment
-
-**For CRITICAL risk (81-100):**
-- Escalate to service owner for approval
-- Mandatory change advisory board review
-- Deploy in maintenance window only
-- Full team availability required
-- Automated rollback configured
-- Customer communication plan ready
-
-## 📈 Next Steps
-
-1. {First recommended action}
-2. {Second recommended action}
-3. {Third recommended action}
+{Based on risk level — see Recommendations section below}
 ```
 
 ### 5. Handle Errors Gracefully
 
 **Resource Not Found (404):**
-> The resource "{resource_id}" was not found in the Neo4j graph. 
-> 
+> The resource "{resource_id}" was not found in the Neo4j graph.
+>
 > Possible reasons:
 > - Resource doesn't exist yet (new resource)
 > - Typo in resource ID
@@ -265,73 +222,156 @@ Format the JSON as markdown with clear sections:
 
 ## Scoring Rubric (Deterministic)
 
-The risk scoring engine uses these rules:
+The risk scoring engine uses **13 deterministic rules** applied to evidence gathered from the Neo4j graph. There are no subjective deductions — every factor adds 0 or more points. The total is capped at 100.
 
-### Base Score by Environment
-- `prod`: Start at 30 points
-- `staging`: Start at 20 points
-- `dev`: Start at 10 points
-- `test`: Start at 5 points
+**Risk model version**: `0.1`
+**Maximum theoretical score**: 130 (before cap)
 
-### Evidence-Based Additions
+### Factor Summary
 
-**Incident History** (last 180 days, capped at +25):
-- 1-2 incidents: +5 points
-- 3-5 incidents: +10 points
-- 6-10 incidents: +15 points
-- 11+ incidents: +20 points
-- Any Sev0/Sev1: +5 points
-- Change-related incidents: +5 points
+| # | Factor ID | Title | Max Pts | Evidence Key |
+|---|-----------|-------|---------|--------------|
+| 1 | `env.production` | Production environment | 0 | `change.environment` |
+| 2 | `blast_radius.services` | Blast radius (services impacted) | 25 | `services_impacted` |
+| 3 | `blast_radius.critical_services` | Critical service | 5 | `critical_services` |
+| 4 | `blast_radius.subscriptions` | Blast radius (subscriptions) | 10 | `subscription_count` |
+| 5 | `history.outages_180d` | Recent outages (180d) | 10 | `historical_outages_180d` |
+| 6 | `ops.recent_active_outages` | Recent active outages (7d) | 5 | `recent_active_outages` |
+| 7 | `ops.deployments_30d` | Deployment frequency (30d) | 10 | `deployment_count_30d` |
+| 8 | `change.destructive` | Destructive operations | 10 | `change.operations` |
+| 9 | `deployment.stage_failures` | Recent deployment stage failures | 15 | `deployment_stage_failures` |
+| 10 | `incident.mttm` | Slow incident mitigation | 10 | `avg_mttm_minutes` |
+| 11 | `artifact.deep_deps` | Deep artifact dependency chains | 10 | `max_dependency_depth` |
+| 12 | `resource.peer_impact` | Resources in same ResourceGroup | 8 | `peer_resource_count` |
+| 13 | `incident.recurrence` | Similar past incidents | 12 | `related_incidents` |
 
-**Deployment Frequency** (last 30 days):
-- 0-1 deployments: +10 points (stale system)
-- 2-5 deployments: +0 points (healthy cadence)
-- 6-10 deployments: +5 points (high velocity)
-- 11+ deployments: +10 points (very high churn)
+### Detailed Scoring Rules
 
-**Blast Radius**:
-- Multiple subscriptions: +5 points
-- >15 owned resources: +5 points
-- Multiple locations: +3 points
+**1. Production environment** (`env.production`, max 0 pts)
+- Tracked for visibility but scored at 0 — all assessments target prod, so this never differentiates risk
+- Status: hit (prod), miss (non-prod), unknown (missing)
 
-**Operational Maturity** (reductions):
-- Clear team ownership: -5 points
-- Linked repository: -3 points
-- Recent successful deployments: -5 points
+**2. Blast radius — services** (`blast_radius.services`, max 25 pts)
+- ≥5 services: 25 pts
+- ≥3 services: 18 pts
+- 2 services: 10 pts
+- 1 service: 5 pts
+- 0 services: 0 pts
 
-**Final clamping**: [0, 100]
+**3. Critical service** (`blast_radius.critical_services`, max 5 pts)
+- Any critical service present: 5 pts
+- None: 0 pts
+
+**4. Blast radius — subscriptions** (`blast_radius.subscriptions`, max 10 pts)
+- ≥10 subscriptions: 10 pts
+- ≥5 subscriptions: 7 pts
+- ≥2 subscriptions: 4 pts
+- 1 subscription: 2 pts
+- 0 subscriptions: 0 pts
+
+**5. Recent outages** (`history.outages_180d`, max 10 pts)
+- ≥2 outages in 180d: 10 pts
+- 1 outage: 5 pts
+- 0 outages: 0 pts
+
+**6. Recent active outages** (`ops.recent_active_outages`, max 5 pts)
+- Any active outage (7d): 5 pts
+- None: 0 pts
+
+**7. Deployment frequency** (`ops.deployments_30d`, max 10 pts)
+- ≥20 deployments in 30d: 10 pts
+- ≥10 deployments: 5 pts
+- <10 deployments: 0 pts
+
+**8. Destructive operations** (`change.destructive`, max 10 pts)
+- Operations include "delete" or "destroy": 10 pts
+- Otherwise: 0 pts
+- No operations provided: status "na"
+
+**9. Deployment stage failures** (`deployment.stage_failures`, max 15 pts)
+- ≥3 failures: 15 pts
+- 2 failures: 10 pts
+- 1 failure: 5 pts
+- 0 failures: 0 pts
+
+**10. Slow incident mitigation** (`incident.mttm`, max 10 pts)
+- ≥60 min MTTM: 10 pts
+- ≥30 min: 7 pts
+- ≥15 min: 4 pts
+- <15 min: 0 pts
+
+**11. Deep artifact dependencies** (`artifact.deep_deps`, max 10 pts)
+- Depth ≥3: 10 pts
+- Depth 2: 5 pts
+- Depth ≤1: 0 pts
+
+**12. Peer resources in ResourceGroup** (`resource.peer_impact`, max 8 pts)
+- ≥10 peers: 8 pts
+- ≥5 peers: 5 pts
+- ≥2 peers: 3 pts
+- <2 peers: 0 pts
+
+**13. Incident recurrence** (`incident.recurrence`, max 12 pts)
+- ≥3 related incidents: 12 pts
+- 2 related incidents: 8 pts
+- 1 related incident: 4 pts
+- 0 related incidents: 0 pts
+
+### Score Capping
+
+- Raw score = sum of all factor points
+- If raw score > 100, cap at 100
+- Final score ∈ [0, 100]
 
 ## Risk Levels
 
-- **0-30**: LOW - Standard approval
-- **31-60**: MEDIUM - Requires review
-- **61-80**: HIGH - Requires approval + planning
-- **81-100**: CRITICAL - Escalation required
+Three levels with deterministic thresholds:
+
+| Level | Range | Verdict | Action |
+|-------|-------|---------|--------|
+| **LOW** | 0–33 | ✅ Safe to proceed | Standard deployment process |
+| **MEDIUM** | 34–66 | ⚠️ Proceed with caution | Review + rollback plan |
+| **HIGH** | 67–100 | ⛔ Review carefully | Approval + maintenance window |
+
+### Recommendations by Risk Level
+
+**LOW (0–33):**
+- Proceed with standard deployment procedures
+- Follow normal change management process
+- Monitor deployment metrics
+
+**MEDIUM (34–66):**
+- Review change during team sync
+- Verify recent deployment history before proceeding
+- Have rollback plan ready
+- Consider staging environment test first
+- Monitor closely during deployment
+
+**HIGH (67–100):**
+- Immediate attention required
+- Consider deploying during maintenance window
+- Ensure rollback procedures are tested and ready
+- Notify stakeholders and on-call teams before deployment
+- Require peer review of changes
+- Have on-call engineer standing by
+
+## Factor Statuses
+
+Each factor has a status field:
+- **hit** 🔴 — Factor contributed points to the score
+- **miss** 🟢 — Factor was evaluated but scored 0
+- **unknown** ❓ — Evidence data was missing (listed in unknowns)
+- **na** ⚪ — Factor not applicable (e.g., no operations provided)
 
 ## Guardrails
 
 1. **Read-only by default**: Don't modify Neo4j graph
 2. **Deterministic**: Same inputs always produce same score
-3. **Evidence-based**: Every point in score must be explained
-4. **Bounded queries**: Use LIMIT to prevent huge result sets
-5. **Graceful degradation**: Handle missing data without failing
-
-## Future: MCP Tool Integration
-
-Once `risk-scoring` MCP server is implemented (tracked in iac-risk-scoring-5gd):
-
-```python
-# Agent will use MCP tool directly
-result = mcp_risk_scoring_assess(
-    resource_id="res-alpha-app",
-    environment="prod",
-    change_type="update"  # optional
-)
-
-# Returns same JSON structure as CLI
-# No need to manage Neo4j connection
-# Consistent with beads and neo4j-database MCPs
-```
+3. **Evidence-based**: Every point in score is explained by a factor
+4. **Bounded queries**: All Cypher queries use LIMIT to prevent huge result sets
+5. **Allowlisted queries**: Only 12 pre-approved Cypher query templates are executed
+6. **Graceful degradation**: Missing evidence → status "unknown" + listed in unknowns array
+7. **Type-safe**: Evidence fields are validated (int/str/bool) before scoring
 
 ## Example Interaction
 
@@ -339,43 +379,54 @@ result = mcp_risk_scoring_assess(
 
 **Agent**:
 1. Extract: resource_id="res-alpha-app", environment="prod"
-2. Run: `python -m risk_scoring --resource-id "res-alpha-app" --environment prod`
+2. Call: `mcp_risk_scoring_assess_resource(resource_id="res-alpha-app", environment="prod")`
 3. Parse JSON response
 4. Format as user-friendly markdown report
 5. Provide verdict and recommendations
 
 **Sample Output**:
 > # Risk Assessment: res-alpha-app
-> 
+>
 > ## 🎯 Risk Summary
-> - **Score**: 55/100 (MEDIUM)
-> - **Verdict**: PROCEED_WITH_CAUTION
+> - **Score**: 42/100 (MEDIUM)
+> - **Verdict**: ⚠️ Moderate risk — Proceed with caution
 > - **Environment**: prod
-> 
-> ## 📊 Risk Factors
-> 
-> | Factor | Points | Reasoning |
-> |--------|--------|-----------|
-> | Production Environment | +30 | Changes to prod carry inherent risk |
-> | Recent Incidents | +15 | 4 incidents in last 180 days |
-> | High Severity | +5 | 1 Sev1 incident recorded |
-> | Healthy Deployment | -5 | 3 successful deployments in 30 days |
-> | Team Ownership | -5 | Clear ownership by Team Alpha |
-> 
+>
+> ## ⚠️ Risk Factors
+>
+> | Factor | Status | Points | Reasoning |
+> |--------|--------|--------|-----------|
+> | 🟢 Production environment | miss | 0/0 | Scored at 0 — all assessments target prod |
+> | 🔴 Blast radius (services) | hit | 10/25 | 2 services impacted |
+> | 🔴 Critical service | hit | 5/5 | External-facing service |
+> | 🟢 Blast radius (subscriptions) | miss | 0/10 | Single subscription |
+> | 🔴 Recent outages (180d) | hit | 10/10 | 3 outages in last 180 days |
+> | 🟢 Active outages (7d) | miss | 0/5 | No active outages |
+> | 🟢 Deployment frequency | miss | 0/10 | 4 deployments in 30d |
+> | ⚪ Destructive operations | na | 0/10 | No operations provided |
+> | 🔴 Stage failures | hit | 10/15 | 2 failed deployment stages |
+> | 🔴 Slow mitigation | hit | 7/10 | Avg MTTM 35 minutes |
+> | ❓ Deep dependencies | unknown | 0/10 | Missing data |
+> | ❓ Peer resources | unknown | 0/8 | Missing data |
+> | ❓ Incident recurrence | unknown | 0/12 | Missing data |
+>
+> **Total Score**: 42/100
+>
+> ## ❓ Unknowns
+> - max_dependency_depth
+> - peer_resource_count
+> - related_incidents
+>
 > ## 💡 Recommendations
-> 
-> **Verdict**: PROCEED_WITH_CAUTION
-> 
-> 1. Review change during team sync
-> 2. Test in staging environment first
-> 3. Schedule during low-traffic window (early morning)
-> 4. Prepare rollback plan
-> 5. Monitor key metrics: error rate, latency, availability
+>
+> - **Review recommended**: This change has moderate risk
+> - Multiple services affected — Coordinate with service owners
+> - Recent outages detected — Review incident history
+> - ⚠️ Missing 3 data points — Risk assessment may be incomplete
 
 ## References
 
 - Risk Scoring Engine: [risk_scoring/](../../risk_scoring/)
-- MCP Server: [approach2-using-existing-graph/README.md](../../approach2-using-existing-graph/README.md) (Section 8)
-- CLI Documentation: [README.md](../../README.md)
-- FastAPI Service: [README.md](../../README.md)
-- Beads issue tracking: `iac-risk-scoring-5gd` (MCP server implementation)
+- Scoring Model: [docs/SCORING_MODEL.md](../../docs/SCORING_MODEL.md)
+- Architecture: [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)
+- CLI & API Documentation: [README.md](../../README.md)

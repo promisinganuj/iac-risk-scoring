@@ -274,7 +274,7 @@ class TestPhase4ServiceRepos:
         from risk_scoring.kusto_evidence_provider import KustoEvidenceProvider
 
         client = self._mock_client({
-            "open_icms": [{"open_icms": 3}],
+            "recent_active_outages": [{"recent_active_outages": 3}],
             "avg_mttm_minutes": [{"avg_mttm_minutes": 42}],
             "historical_outages_180d": [{"historical_outages_180d": 2}],
             "related_incidents": [{"related_incidents": 1}],
@@ -316,7 +316,7 @@ class TestPhase4ServiceRepos:
         from risk_scoring.kusto_evidence_provider import KustoEvidenceProvider
 
         client = self._mock_client({
-            "open_icms": [{"open_icms": 3}],
+            "recent_active_outages": [{"recent_active_outages": 3}],
             "avg_mttm_minutes": [{"avg_mttm_minutes": 42}],
             "historical_outages_180d": [{"historical_outages_180d": 2}],
             "related_incidents": [{"related_incidents": 1}],
@@ -337,7 +337,7 @@ class TestPhase4ServiceRepos:
         from risk_scoring.kusto_evidence_provider import KustoEvidenceProvider
 
         client = self._mock_client({
-            "open_icms": [{"open_icms": 3}],
+            "recent_active_outages": [{"recent_active_outages": 3}],
             "avg_mttm_minutes": [{"avg_mttm_minutes": 42}],
             "historical_outages_180d": [{"historical_outages_180d": 2}],
             "related_incidents": [{"related_incidents": 1}],

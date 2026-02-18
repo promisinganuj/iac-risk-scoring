@@ -37,7 +37,7 @@ class KqlQuerySpec:
     Attributes
     ----------
     query_id : str
-        Unique identifier, e.g. "k1.open_icms".
+        Unique identifier, e.g. "k1.recent_active_outages".
     kql : str
         KQL template with ``{param}`` placeholders.
     params : tuple[ParamSpec, ...]
@@ -170,22 +170,24 @@ _SERVICE_NAME_PARAM = ParamSpec(
 
 KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
 
-    # k1 — Count of open (unresolved) IcM incidents for a service
-    "k1.open_icms": KqlQuerySpec(
-        query_id="k1.open_icms",
+    # k1 — Count of recent active outage incidents (last 7 days) for a service
+    "k1.recent_active_outages": KqlQuerySpec(
+        query_id="k1.recent_active_outages",
         kql=(
             f"{_ICM_TABLE}\n"
             "| where OwningTenantName == {serviceName}\n"
-            "| where isempty(ResolveDate)\n"
-            "| summarize open_icms = count()\n"
+            "| where CreateDate >= ago(7d)\n"
+            "| where Status == \"ACTIVE\"\n"
+            "| where IsOutage == true\n"
+            "| summarize recent_active_outages = count()\n"
             "| take {take}"
         ),
         params=(_SERVICE_NAME_PARAM,),
         source="icm",
         max_take=1,
         default_take=1,
-        evidence_key="open_icms",
-        description="Count of open (unresolved) IcM incidents for a service.",
+        evidence_key="recent_active_outages",
+        description="Count of recent active outage incidents (last 7d) for a service.",
     ),
 
     # k4 — Average MTTM (ImpactStartDate → MitigateDate) in minutes, last 180d

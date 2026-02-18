@@ -27,9 +27,9 @@ _VALID_RESOURCE_GROUP = "rg-payments-prod"
 
 class TestGetKqlQuery:
     def test_known_query(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         assert isinstance(q, KqlQuerySpec)
-        assert q.query_id == "k1.open_icms"
+        assert q.query_id == "k1.recent_active_outages"
 
     def test_unknown_query_raises(self) -> None:
         with pytest.raises(UnknownQueryError, match="not allowlisted"):
@@ -48,28 +48,28 @@ class TestGetKqlQuery:
 
 class TestValidateKqlParams:
     def test_valid_service_name(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         result = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         assert result["serviceName"] == _VALID_SERVICE_NAME
         assert result["take"] == q.default_take
 
     def test_missing_required_service_name(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="Missing required"):
             validate_kql_params(q, {})
 
     def test_empty_service_name(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="non-empty"):
             validate_kql_params(q, {"serviceName": ""})
 
     def test_service_name_too_long(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="max_len"):
             validate_kql_params(q, {"serviceName": "a" * 257})
 
     def test_service_name_must_be_string(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="must be a string"):
             validate_kql_params(q, {"serviceName": 12345})
 
@@ -89,32 +89,32 @@ class TestValidateKqlParams:
 
 class TestTakeValidation:
     def test_default_take(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         result = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         assert result["take"] == 1  # k1 default_take=1
 
     def test_explicit_take(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         result = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": 1})
         assert result["take"] == 1
 
     def test_take_exceeds_max(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="max_take"):
             validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": 100})
 
     def test_take_zero(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="must be > 0"):
             validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": 0})
 
     def test_take_negative(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="must be > 0"):
             validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": -1})
 
     def test_take_not_int(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         with pytest.raises(ParameterValidationError, match="must be an int"):
             validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME, "take": "5"})
 
@@ -125,14 +125,16 @@ class TestTakeValidation:
 
 
 class TestBuildKql:
-    def test_k1_open_icms(self) -> None:
-        q = get_kql_query("k1.open_icms")
+    def test_k1_recent_active_outages(self) -> None:
+        q = get_kql_query("k1.recent_active_outages")
         params = validate_kql_params(q, {"serviceName": _VALID_SERVICE_NAME})
         kql = build_kql(q, params)
         # Should contain the service name single-quoted
         assert f"OwningTenantName == '{_VALID_SERVICE_NAME}'" in kql
-        assert "isempty(ResolveDate)" in kql
-        assert "open_icms = count()" in kql
+        assert "CreateDate >= ago(7d)" in kql
+        assert 'Status == "ACTIVE"' in kql
+        assert "IsOutage == true" in kql
+        assert "recent_active_outages = count()" in kql
         assert "take 1" in kql
 
     def test_k4_avg_mttm(self) -> None:
@@ -206,7 +208,7 @@ class TestBuildKql:
         assert "peer_resource_count = count()" in kql
 
     def test_unsafe_characters_rejected(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         # Inject a serviceName with KQL injection attempt
         params = {"serviceName": "abc'); .drop table X; //", "take": 1}
         with pytest.raises(ParameterValidationError):
@@ -214,7 +216,7 @@ class TestBuildKql:
             build_kql(q, validated)
 
     def test_quote_injection_rejected(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         # Double-quote in name should be rejected
         params = {"serviceName": 'My Service" | drop', "take": 1}
         with pytest.raises(ParameterValidationError):
@@ -222,7 +224,7 @@ class TestBuildKql:
             build_kql(q, validated)
 
     def test_semicolon_injection_rejected(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         params = {"serviceName": "Service; .drop table X", "take": 1}
         with pytest.raises(ParameterValidationError):
             validated = validate_kql_params(q, params)
@@ -230,13 +232,13 @@ class TestBuildKql:
 
     def test_valid_service_name_with_special_chars(self) -> None:
         """Service names like 'Azure App Service (Payments)' should pass."""
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         params = validate_kql_params(q, {"serviceName": "Azure App Service (Payments)"})
         kql = build_kql(q, params)
         assert "OwningTenantName == 'Azure App Service (Payments)'" in kql
 
     def test_valid_service_name_with_ampersand(self) -> None:
-        q = get_kql_query("k1.open_icms")
+        q = get_kql_query("k1.recent_active_outages")
         params = validate_kql_params(q, {"serviceName": "R&D Platform"})
         kql = build_kql(q, params)
         assert "'R&D Platform'" in kql

@@ -130,18 +130,18 @@ class TestRunProviders:
         assert result.all_queries == ()
 
     def test_single_provider(self) -> None:
-        p = StubProvider("p1", {"open_icms": 5, "avg_mttm_minutes": 30})
+        p = StubProvider("p1", {"recent_active_outages": 5, "avg_mttm_minutes": 30})
         result = run_providers([p], _resolved())
-        assert result.evidence["open_icms"] == 5
+        assert result.evidence["recent_active_outages"] == 5
         assert result.evidence["avg_mttm_minutes"] == 30
         assert len(result.provider_results) == 1
 
     def test_multiple_providers_merge(self) -> None:
         p1 = StubProvider("neo4j", {"service_id": "svc-123", "services_impacted": 1})
-        p2 = StubProvider("kusto", {"open_icms": 3, "avg_mttm_minutes": 45})
+        p2 = StubProvider("kusto", {"recent_active_outages": 3, "avg_mttm_minutes": 45})
         result = run_providers([p1, p2], _resolved())
         assert result.evidence["service_id"] == "svc-123"
-        assert result.evidence["open_icms"] == 3
+        assert result.evidence["recent_active_outages"] == 3
 
     def test_initial_evidence(self) -> None:
         result = run_providers(
@@ -153,22 +153,22 @@ class TestRunProviders:
 
     def test_provider_error_isolated(self) -> None:
         p1 = FailingProvider()
-        p2 = StubProvider("ok", {"open_icms": 1})
+        p2 = StubProvider("ok", {"recent_active_outages": 1})
         result = run_providers([p1, p2], _resolved())
         # Failing provider recorded with error; second still runs.
         assert result.provider_results[0].error is not None
         assert "crashed" in result.provider_results[0].error
-        assert result.evidence["open_icms"] == 1
+        assert result.evidence["recent_active_outages"] == 1
 
     def test_unknowns_resolved_by_later_provider(self) -> None:
-        # First provider marks "open_icms" as unknown.
-        p1 = StubProvider("neo4j", {}, unknown_keys=("open_icms",))
+        # First provider marks "recent_active_outages" as unknown.
+        p1 = StubProvider("neo4j", {}, unknown_keys=("recent_active_outages",))
         # Second provider actually populates it.
-        p2 = StubProvider("kusto", {"open_icms": 7})
+        p2 = StubProvider("kusto", {"recent_active_outages": 7})
         result = run_providers([p1, p2], _resolved())
         # Should NOT be in final unknowns since p2 populated it.
-        assert "open_icms" not in result.unknowns
-        assert result.evidence["open_icms"] == 7
+        assert "recent_active_outages" not in result.unknowns
+        assert result.evidence["recent_active_outages"] == 7
 
     def test_unknowns_remain_if_not_populated(self) -> None:
         p = StubProvider("neo4j", {}, unknown_keys=("critical_services",))
@@ -215,7 +215,7 @@ class TestKustoEvidenceProvider:
 
     def test_all_keys_populated(self) -> None:
         client = self._mock_client({
-            "open_icms": [{"open_icms": 3}],
+            "recent_active_outages": [{"recent_active_outages": 3}],
             "avg_mttm_minutes": [{"avg_mttm_minutes": 42}],
             "historical_outages_180d": [{"historical_outages_180d": 2}],
             "related_incidents": [{"related_incidents": 1}],
@@ -229,16 +229,16 @@ class TestKustoEvidenceProvider:
         evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
-        assert evidence["open_icms"] == 3
+        assert evidence["recent_active_outages"] == 3
         assert evidence["avg_mttm_minutes"] == 42
         assert evidence["historical_outages_180d"] == 2
         assert evidence["related_incidents"] == 1
         assert evidence["deployment_count_30d"] == 12
-        assert evidence["deployment_stage_failures"] == 3
+        assert evidence["deployment_stage_failures"] is None  # always unknown
         assert evidence["service_tree_id"] == "abc-123"
         assert evidence["subscription_count"] == 1
-        assert result.unknown_keys == ("peer_resource_count",)
-        assert len(result.populated_keys) == 13
+        assert result.unknown_keys == ("deployment_stage_failures", "peer_resource_count", "services_impacted")
+        assert len(result.populated_keys) == 11
 
     def test_no_service_name_marks_all_unknown(self) -> None:
         client = MagicMock()
@@ -272,8 +272,8 @@ class TestKustoEvidenceProvider:
         result = provider.populate(_resolved(), evidence)
 
         # First query failed, but others should still run.
-        assert client.execute.call_count == 9
-        assert any(k in result.unknown_keys for k in ["open_icms"])
+        assert client.execute.call_count == 8
+        assert any(k in result.unknown_keys for k in ["recent_active_outages"])
 
     def test_empty_result_marks_unknown(self) -> None:
         client = MagicMock()
@@ -282,9 +282,9 @@ class TestKustoEvidenceProvider:
         evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
-        # 6 scalar + service_tree_id unknown; subscriptions + repos also unknown since no ServiceId
-        assert len(result.unknown_keys) == 13
-        assert len(result.populated_keys) == 1
+        # 6 scalar + service_tree_id + services_impacted unknown; subscriptions + repos also unknown since no ServiceId
+        assert len(result.unknown_keys) == 14
+        assert len(result.populated_keys) == 0
 
     def test_provider_name(self) -> None:
         provider = KustoEvidenceProvider(MagicMock())
@@ -292,14 +292,14 @@ class TestKustoEvidenceProvider:
 
     def test_queries_recorded(self) -> None:
         client = MagicMock()
-        client.execute.return_value = [{"open_icms": 5, "ServiceId": "00000000-0000-0000-0000-000000000001"}]
+        client.execute.return_value = [{"recent_active_outages": 5, "ServiceId": "00000000-0000-0000-0000-000000000001"}]
         provider = KustoEvidenceProvider(client)
         evidence: Dict[str, Any] = {"service_name": "Azure App Service (Payments)"}
         result = provider.populate(_resolved(), evidence)
 
-        assert len(result.queries) == 9
+        assert len(result.queries) == 8
         query_ids = [q.query_id for q in result.queries]
-        assert "k1.open_icms" in query_ids
+        assert "k1.recent_active_outages" in query_ids
         assert "k8.deployment_count_30d" in query_ids
         assert "k7.service_tree_lookup" in query_ids
 
@@ -319,10 +319,9 @@ class TestNeo4jEvidenceProvider:
             evidence={
                 "resource_id": "res-alpha-app",
                 "service_id": "svc-123",
-                "services_impacted": 1,
             },
             queries=(),
-            unknowns=("critical_services", "open_icms"),
+            unknowns=("critical_services", "recent_active_outages", "services_impacted"),
         )
 
         with patch(
@@ -334,9 +333,10 @@ class TestNeo4jEvidenceProvider:
             result = provider.populate(_resolved(), evidence)
 
         assert evidence["service_id"] == "svc-123"
-        assert evidence["services_impacted"] == 1
+        # services_impacted not set by Neo4j provider (requires IcM)
+        assert "services_impacted" in result.unknown_keys
         assert "critical_services" in result.unknown_keys
-        assert "open_icms" in result.unknown_keys
+        assert "recent_active_outages" in result.unknown_keys
 
     def test_error_returns_error_result(self) -> None:
         mock_client = MagicMock()
@@ -371,19 +371,18 @@ class TestProviderOrdering:
             {
                 "service_id": "A56C6700-6666-4444-AAAA-000F3B9CC999",
                 "service_name": "Azure App Service (Payments)",
-                "services_impacted": 1,
             },
         )
         kusto_provider = StubProvider(
             "kusto",
-            {"open_icms": 5, "avg_mttm_minutes": 30},
+            {"recent_active_outages": 5, "avg_mttm_minutes": 30},
         )
         result = run_providers(
             [neo4j_provider, kusto_provider],
             _resolved(),
         )
         assert result.evidence["service_name"] == "Azure App Service (Payments)"
-        assert result.evidence["open_icms"] == 5
+        assert result.evidence["recent_active_outages"] == 5
 
     def test_kusto_without_neo4j_no_crash(self) -> None:
         """When Kusto runs alone without service_name, it degrades gracefully."""
@@ -416,7 +415,7 @@ class TestKustoProviderWithRegistry:
 
         mock_registry = MagicMock(spec=KustoSourceRegistry)
         mock_client = MagicMock()
-        mock_client.execute.return_value = [{"open_icms": 7, "ServiceId": "00000000-0000-0000-0000-000000000001"}]
+        mock_client.execute.return_value = [{"recent_active_outages": 7, "ServiceId": "00000000-0000-0000-0000-000000000001"}]
         mock_registry.get_client.return_value = mock_client
 
         provider = KustoEvidenceProvider(mock_registry)
@@ -424,7 +423,7 @@ class TestKustoProviderWithRegistry:
         provider.populate(_resolved(), evidence)
 
         # The provider should have called get_client for each query's source.
-        assert mock_registry.get_client.call_count == 9
+        assert mock_registry.get_client.call_count == 8
         # Calls should be for "icm", "safefly", and "service_tree" sources.
         source_names = [call[0][0] for call in mock_registry.get_client.call_args_list]
         assert "icm" in source_names

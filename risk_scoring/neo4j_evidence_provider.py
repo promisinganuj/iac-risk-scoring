@@ -39,7 +39,7 @@ class Neo4jEvidenceProvider:
     - recent_incidents, recent_deployments
     - deployment_count_30d (always unknown in current graph)
     - critical_services (always unknown in current graph)
-    - open_icms (always unknown in current graph)
+    - recent_active_outages (always unknown in current graph)
     """
 
     def __init__(self, client: EvidenceClient) -> None:

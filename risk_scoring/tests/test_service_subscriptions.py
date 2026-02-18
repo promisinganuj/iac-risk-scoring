@@ -121,7 +121,7 @@ class TestProviderSubscriptions(unittest.TestCase):
         provider = self._make_provider(
             {
                 # k1-k9 scalar queries return 0
-                "OwningTenantName": [{"open_icms": 0}],
+                "OwningTenantName": [{"recent_active_outages": 0}],
                 "IsOutage": [{"historical_outages_180d": 0}],
                 "ParentIncidentId": [{"related_incidents": 0}],
                 "SafeFlyRequestCurrentMV": [{"deployment_count_30d": 0}],
@@ -150,7 +150,7 @@ class TestProviderSubscriptions(unittest.TestCase):
         evidence: dict = {"service_name": "Test Service"}
         result = provider.populate(self._resolved(), evidence)
 
-        assert evidence["subscription_count"] == 2
+        assert evidence["subscription_count"] == 1  # only Production subs counted
         assert len(evidence["service_subscriptions"]) == 2
         assert evidence["service_subscriptions"][0]["subscription_id"] == "sub-1"
         assert "subscription_count" in result.populated_keys
@@ -159,7 +159,7 @@ class TestProviderSubscriptions(unittest.TestCase):
         """If k7 returns nothing, subscriptions should be unknown."""
         provider = self._make_provider(
             {
-                "OwningTenantName": [{"open_icms": 0}],
+                "OwningTenantName": [{"recent_active_outages": 0}],
                 "IsOutage": [{"historical_outages_180d": 0}],
                 "ParentIncidentId": [{"related_incidents": 0}],
                 "SafeFlyRequestCurrentMV": [{"deployment_count_30d": 0}],
@@ -188,7 +188,7 @@ class TestProviderSubscriptions(unittest.TestCase):
         """k7 should populate service_tree_id."""
         provider = self._make_provider(
             {
-                "OwningTenantName": [{"open_icms": 0}],
+                "OwningTenantName": [{"recent_active_outages": 0}],
                 "IsOutage": [{"historical_outages_180d": 0}],
                 "ParentIncidentId": [{"related_incidents": 0}],
                 "SafeFlyRequestCurrentMV": [{"deployment_count_30d": 0}],
@@ -221,13 +221,12 @@ class TestSubscriptionCountScoring(unittest.TestCase):
             "critical_services": [],
             "subscription_count": count,
             "historical_outages_180d": 0,
-            "open_icms": 0,
+            "recent_active_outages": 0,
             "deployment_count_30d": 5,
             "deployment_stage_failures": 0,
             "avg_mttm_minutes": 30,
             "related_incidents": 0,
             "change_frequency_30d": 5,
-            "template_complexity": "low",
         }
         change = ChangeContext.create(environment="prod")
         result = score_change(change, evidence)

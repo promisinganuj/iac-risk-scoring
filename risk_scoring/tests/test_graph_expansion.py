@@ -69,10 +69,12 @@ class TestGraphExpansion(unittest.TestCase):
         resolved = ResolvedEntityRef(label="AzureResource", resource_id="res-x")
         result = expand_evidence_for_resource(resolved, client, as_of=date(2026, 1, 1))
 
-        self.assertEqual(result.evidence["services_impacted"], 1)
+        # services_impacted is no longer set by graph expansion
+        # (cross-service blast radius requires IcM data)
+        self.assertNotIn("services_impacted", result.evidence)
         # cutoff is 2025-07-05; only ICM-1 is within window
         self.assertEqual(result.evidence["historical_outages_180d"], 1)
-        self.assertIsNone(result.evidence["open_icms"])
+        self.assertIsNone(result.evidence["recent_active_outages"])
         self.assertIsNone(result.evidence["deployment_count_30d"])
         self.assertEqual(len(result.evidence["recent_incidents"]), 2)
         self.assertEqual(len(result.evidence["recent_deployments"]), 2)

@@ -138,6 +138,8 @@ def score_change(
         unknowns.append(field)
 
     # Rule 1: production environment.
+    # Tracked for visibility but scored at 0 — in practice we only
+    # assess production changes, so this factor never differentiates risk.
     if change.environment is None:
         unknown("change.environment")
         factors.append(
@@ -146,7 +148,7 @@ def score_change(
                 title="Production environment",
                 status="unknown",
                 points=0,
-                max_points=20,
+                max_points=0,
                 reason="Change environment is missing.",
                 evidence={"environment": None},
             )
@@ -157,9 +159,9 @@ def score_change(
                 factor_id="env.production",
                 title="Production environment",
                 status="hit",
-                points=20,
-                max_points=20,
-                reason="Changes in production carry higher risk.",
+                points=0,
+                max_points=0,
+                reason="Production environment noted (scored at 0 — all assessments target prod).",
                 evidence={"environment": change.environment},
             )
         )
@@ -170,8 +172,8 @@ def score_change(
                 title="Production environment",
                 status="miss",
                 points=0,
-                max_points=20,
-                reason="Non-production environments are generally lower risk.",
+                max_points=0,
+                reason="Non-production environment.",
                 evidence={"environment": change.environment},
             )
         )
@@ -187,7 +189,7 @@ def score_change(
                 status="unknown",
                 points=0,
                 max_points=25,
-                reason="services_impacted is missing.",
+                reason="Cross-service blast radius not yet computable (requires IcM data).",
                 evidence={"services_impacted": None},
             )
         )
@@ -209,36 +211,38 @@ def score_change(
                 status="hit" if pts > 0 else "miss",
                 points=pts,
                 max_points=25,
-                reason="More impacted services increases operational risk.",
+                reason="Historical cross-service blast radius from incident data.",
                 evidence={"services_impacted": services_impacted},
             )
         )
 
-    # Rule 3: critical services.
+    # Rule 3: critical service check.
+    # Is the service being changed classified as critical (external-facing
+    # or high Service Tree level)?  Binary: 5 pts if yes, 0 otherwise.
     critical_services = _require_str_list(evidence, "critical_services")
     if critical_services is None:
         unknown("critical_services")
         factors.append(
             ScoreFactor(
                 factor_id="blast_radius.critical_services",
-                title="Critical services impacted",
+                title="Critical service",
                 status="unknown",
                 points=0,
-                max_points=15,
+                max_points=5,
                 reason="critical_services is missing.",
                 evidence={"critical_services": None},
             )
         )
     else:
-        pts = 15 if len(critical_services) > 0 else 0
+        pts = 5 if len(critical_services) > 0 else 0
         factors.append(
             ScoreFactor(
                 factor_id="blast_radius.critical_services",
-                title="Critical services impacted",
+                title="Critical service",
                 status="hit" if pts > 0 else "miss",
                 points=pts,
-                max_points=15,
-                reason="Impacts to critical services are higher risk.",
+                max_points=5,
+                reason="Service is classified as critical (external-facing or high Service Tree level).",
                 evidence={"critical_services": list(critical_services)},
             )
         )
@@ -315,32 +319,32 @@ def score_change(
             )
         )
 
-    # Rule 5: open incidents (ICMs).
-    open_icms = _require_int(evidence, "open_icms")
-    if open_icms is None:
-        unknown("open_icms")
+    # Rule 5: recent active outages (last 7 days).
+    recent_outages = _require_int(evidence, "recent_active_outages")
+    if recent_outages is None:
+        unknown("recent_active_outages")
         factors.append(
             ScoreFactor(
-                factor_id="ops.open_icms",
-                title="Open incidents",
+                factor_id="ops.recent_active_outages",
+                title="Recent active outages (7d)",
                 status="unknown",
                 points=0,
                 max_points=5,
-                reason="open_icms is missing.",
-                evidence={"open_icms": None},
+                reason="recent_active_outages is missing.",
+                evidence={"recent_active_outages": None},
             )
         )
     else:
-        pts = 5 if open_icms > 0 else 0
+        pts = 5 if recent_outages > 0 else 0
         factors.append(
             ScoreFactor(
-                factor_id="ops.open_icms",
-                title="Open incidents",
+                factor_id="ops.recent_active_outages",
+                title="Recent active outages (7d)",
                 status="hit" if pts > 0 else "miss",
                 points=pts,
                 max_points=5,
-                reason="Active incidents increase operational risk during changes.",
-                evidence={"open_icms": open_icms},
+                reason="Active outage incidents increase operational risk during changes.",
+                evidence={"recent_active_outages": recent_outages},
             )
         )
 
@@ -583,53 +587,6 @@ def score_change(
                 max_points=12,
                 reason="Recurring incidents suggest systematic issues.",
                 evidence={"related_incidents": related_incidents},
-            )
-        )
-
-    # Rule 13: template complexity.
-    required_dependency_count = _require_int(evidence, "template_required_dependency_count")
-    max_dependency_depth = _require_int(evidence, "template_max_dependency_depth")
-    
-    if required_dependency_count is None or max_dependency_depth is None:
-        if required_dependency_count is None:
-            unknown("template_required_dependency_count")
-        if max_dependency_depth is None:
-            unknown("template_max_dependency_depth")
-        factors.append(
-            ScoreFactor(
-                factor_id="template.complexity",
-                title="Template dependency complexity",
-                status="unknown",
-                points=0,
-                max_points=10,
-                reason="Template dependency data is missing.",
-                evidence={
-                    "template_required_dependency_count": required_dependency_count,
-                    "template_max_dependency_depth": max_dependency_depth,
-                },
-            )
-        )
-    else:
-        pts = 0
-        # Award 5 points if > 3 required dependencies
-        if required_dependency_count > 3:
-            pts += 5
-        # Award 5 points if dependency chain depth > 2 hops
-        if max_dependency_depth > 2:
-            pts += 5
-        
-        factors.append(
-            ScoreFactor(
-                factor_id="template.complexity",
-                title="Template dependency complexity",
-                status="hit" if pts > 0 else "miss",
-                points=pts,
-                max_points=10,
-                reason="Complex template dependencies increase deployment risk.",
-                evidence={
-                    "template_required_dependency_count": required_dependency_count,
-                    "template_max_dependency_depth": max_dependency_depth,
-                },
             )
         )
 

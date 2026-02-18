@@ -38,6 +38,11 @@ The total score is `sum(factor.points)`, capped at 100.
 |--------|--------------------------|
 | Max points | 25 |
 | Evidence | `services_impacted` (int) |
+| Status | **Currently unknown** — requires IcM cross-service blast radius query (not yet implemented) |
+
+**Business intent:** How many distinct services were historically co-impacted
+in outages caused by deployments of this service? This measures the
+cross-service blast radius from incident data.
 
 | Threshold | Points |
 |-----------|--------|
@@ -46,6 +51,11 @@ The total score is `sum(factor.points)`, capped at 100.
 | 2 | 10 |
 | 1 | 5 |
 | 0 | 0 |
+
+> **Note:** The graduated thresholds represent the target design. Neither
+> the Neo4j nor Kusto provider currently populates this evidence key —
+> it will be implemented via a dedicated KQL query against IcM incident
+> data that counts distinct co-impacted services.
 
 ### 3. Blast Radius — Critical Services
 
@@ -73,6 +83,7 @@ The total score is `sum(factor.points)`, capped at 100.
 > Subscription count is resolved via Service Tree
 > `GetSubscriptionsAssociatedWith()` through the KustoEvidenceProvider
 > (phase 2: k7 → ServiceId, phase 3: k10 → subscriptions).
+> **Only production subscriptions are counted** (environment = "Production" or "Prod").
 
 ### 4. Recent Outages (180 days)
 
@@ -87,13 +98,15 @@ The total score is `sum(factor.points)`, capped at 100.
 | 1 | 5 |
 | 0 | 0 |
 
-### 5. Open Incidents
+### 5. Recent Active Outages (7 days)
 
-| Factor | `ops.open_icms` |
-|--------|------------------|
+| Factor | `ops.recent_active_outages` |
+|--------|-------------------------------|
 | Max points | 5 |
-| Evidence | `open_icms` (int) |
-| Logic | Any open IcM → 5 pts; 0 → 0 pts |
+| Evidence | `recent_active_outages` (int) |
+| Logic | Any active outage in last 7d → 5 pts; 0 → 0 pts |
+
+> Query filters: `CreateDate >= ago(7d)`, `Status == "ACTIVE"`, `IsOutage == true`.
 
 ### 6. Deployment Frequency (30 days)
 
@@ -123,6 +136,7 @@ The total score is `sum(factor.points)`, capped at 100.
 |--------|------------------------------|
 | Max points | 15 |
 | Evidence | `deployment_stage_failures` (int) |
+| Status | **Currently unknown** — Abandoned/Rejected SafeFly status is a poor proxy for actual deployment failures. Thresholds retained for future use. |
 
 | Threshold | Points |
 |-----------|--------|
@@ -130,6 +144,10 @@ The total score is `sum(factor.points)`, capped at 100.
 | 2 | 10 |
 | 1 | 5 |
 | 0 | 0 |
+
+> **Note**: The k9 query counting Abandoned/Rejected SafeFly requests has been
+> disabled. A better signal (e.g., actual rollbacks, failed stages) needs to be
+> identified before this factor can contribute to the score.
 
 ### 9. Slow Incident Mitigation (MTTM)
 
@@ -186,31 +204,16 @@ The total score is `sum(factor.points)`, capped at 100.
 | 1 | 4 |
 | 0 | 0 |
 
-### 13. Template Dependency Complexity
-
-| Factor | `template.complexity` |
-|--------|------------------------|
-| Max points | 10 |
-| Evidence | `template_required_dependency_count` (int), `template_max_dependency_depth` (int) |
-
-| Condition | Points |
-|-----------|--------|
-| > 3 required dependencies | +5 |
-| dependency depth > 2 hops | +5 |
-
-Both evidence keys must be present; if either is missing, the factor is
-unknown.
-
 ## Summary Table
 
 | # | Factor ID | Title | Max | Evidence Key(s) | Source |
 |---|-----------|-------|-----|-----------------|--------|
 | 1 | `env.production` | Production environment | 20 | `change.environment` | Change context |
 | 2 | `blast_radius.services` | Services impacted | 25 | `services_impacted` | Neo4j / Kusto |
-| 3 | `blast_radius.critical_services` | Critical services | 15 | `critical_services` | Neo4j / Kusto (k7) |
+| 3 | `blast_radius.critical_services` | Critical service | 5 | `critical_services` | Kusto (k7) |
 | 3b | `blast_radius.subscriptions` | Subscriptions | 10 | `subscription_count` | Kusto (k10) |
 | 4 | `history.outages_180d` | Recent outages | 10 | `historical_outages_180d` | Kusto (k5) |
-| 5 | `ops.open_icms` | Open incidents | 5 | `open_icms` | Kusto (k1) |
+| 5 | `ops.recent_active_outages` | Recent active outages (7d) | 5 | `recent_active_outages` | Kusto (k1) |
 | 6 | `ops.deployments_30d` | Deploy frequency | 10 | `deployment_count_30d` | Kusto (k8) |
 | 7 | `change.destructive` | Destructive ops | 10 | `change.operations` | Change context |
 | 8 | `deployment.stage_failures` | Stage failures | 15 | `deployment_stage_failures` | Kusto (k9) |
@@ -218,8 +221,7 @@ unknown.
 | 10 | `artifact.deep_deps` | Deep dependencies | 10 | `max_dependency_depth` | Neo4j |
 | 11 | `resource.peer_impact` | Peer resources | 8 | `peer_resource_count` | Neo4j / Kusto ARG (k13, when resource context exists) |
 | 12 | `incident.recurrence` | Incident recurrence | 12 | `related_incidents` | Kusto (k6) |
-| 13 | `template.complexity` | Template complexity | 10 | `template_required_dep…`, `template_max_dep…` | Neo4j |
-| | | **Total possible** | **170** | | |
+| | | **Total possible** | **160** | | |
 
 > The maximum possible score exceeds 100; the engine caps at 100.
 > In practice, a service hitting every factor at max is extremely rare.
@@ -230,14 +232,14 @@ Evidence is gathered by pluggable providers before scoring runs:
 
 | Provider | Keys Populated |
 |----------|----------------|
-| `Neo4jEvidenceProvider` | `services_impacted`, `critical_services`, `max_dependency_depth`, `peer_resource_count`, `template_required_dependency_count`, `template_max_dependency_depth` |
-| `KustoEvidenceProvider` | `open_icms`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count`, `services_impacted`, `critical_services`, `peer_resource_count` |
+| `Neo4jEvidenceProvider` | `critical_services`, `max_dependency_depth`, `peer_resource_count`, `template_required_dependency_count`, `template_max_dependency_depth` |
+| `KustoEvidenceProvider` | `recent_active_outages`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count`, `services_impacted`, `critical_services`, `peer_resource_count` |
 
 The KQL queries are defined in `risk_scoring/kusto_allowlist.py`:
 
 | Query ID | Evidence Key | Kusto Source | Description |
 |----------|-------------|--------------|-------------|
-| `k1.open_icms` | `open_icms` | icm | Open IcM incidents |
+| `k1.recent_active_outages` | `recent_active_outages` | icm | Recent active outage incidents (7d) |
 | `k4.avg_mttm` | `avg_mttm_minutes` | icm | Avg mitigation time (180d) |
 | `k5.outages_180d` | `historical_outages_180d` | icm | Outage count (180d) |
 | `k6.related_incidents` | `related_incidents` | icm | Parent-linked clusters (90d) |

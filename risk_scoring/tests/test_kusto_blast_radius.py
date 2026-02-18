@@ -42,7 +42,7 @@ class FakeKustoClient:
 # =====================================================================
 
 _SCALAR_ZEROS: dict[str, list[dict]] = {
-    "OwningTenantName": [{"open_icms": 0}],
+    "OwningTenantName": [{"recent_active_outages": 0}],
     "IsOutage": [{"historical_outages_180d": 0}],
     "ParentIncidentId": [{"related_incidents": 0}],
     "SafeFlyRequestCurrentMV": [{"deployment_count_30d": 0}],
@@ -65,7 +65,8 @@ class TestServicesImpacted(unittest.TestCase):
     def _make_provider(self, responses: dict) -> KustoEvidenceProvider:
         return KustoEvidenceProvider(FakeKustoClient(responses))
 
-    def test_services_impacted_is_1_with_service_name(self):
+    def test_services_impacted_always_unknown(self):
+        """services_impacted requires IcM cross-service blast radius data; always unknown from provider."""
         provider = self._make_provider(
             {
                 **_SCALAR_ZEROS,
@@ -84,8 +85,8 @@ class TestServicesImpacted(unittest.TestCase):
         evidence: dict = {"service_name": "Payments"}
         result = provider.populate(self._resolved(), evidence)
 
-        self.assertEqual(evidence["services_impacted"], 1)
-        self.assertIn("services_impacted", result.populated_keys)
+        self.assertIsNone(evidence.get("services_impacted"))
+        self.assertIn("services_impacted", result.unknown_keys)
 
     def test_services_impacted_unknown_without_service_name(self):
         provider = self._make_provider({})
@@ -341,7 +342,7 @@ class TestKustoBlastRadiusScoring(unittest.TestCase):
             "subscription_count": subscription_count,
             "peer_resource_count": peer_resource_count,
             "historical_outages_180d": 0,
-            "open_icms": 0,
+            "recent_active_outages": 0,
             "deployment_count_30d": 5,
             "deployment_stage_failures": 0,
             "avg_mttm_minutes": 10,
@@ -373,7 +374,7 @@ class TestKustoBlastRadiusScoring(unittest.TestCase):
             critical_services=["Payments"]
         )
         f = r["factors"]["blast_radius.critical_services"]
-        self.assertEqual(f.points, 15)
+        self.assertEqual(f.points, 5)
         self.assertEqual(f.status, "hit")
 
     def test_empty_critical_services_is_miss(self):
@@ -479,16 +480,19 @@ class TestKustoProviderPipeline(unittest.TestCase):
 
         factors = {f.factor_id: f for f in result.factors}
 
-        # Blast radius facts from Kusto
+        # services_impacted is unknown (cross-service blast radius not yet implemented)
         self.assertEqual(
-            factors["blast_radius.services"].points, 5
-        )  # services_impacted=1
+            factors["blast_radius.services"].status, "unknown"
+        )
         self.assertEqual(
-            factors["blast_radius.critical_services"].points, 15
+            factors["blast_radius.services"].points, 0
+        )
+        self.assertEqual(
+            factors["blast_radius.critical_services"].points, 5
         )  # critical
         self.assertEqual(
-            factors["blast_radius.subscriptions"].points, 4
-        )  # 2 subs = 4pts
+            factors["blast_radius.subscriptions"].points, 2
+        )  # 1 prod sub = 2pts
         self.assertEqual(
             factors["resource.peer_impact"].status, "unknown"
         )  # no ARG

@@ -124,10 +124,11 @@ def expand_evidence_for_resource(
         return GraphExpansionResult(
             evidence={
                 "resource_id": resolved.resource_id,
-                "services_impacted": 0,
+                # services_impacted left unset — cross-service blast radius
+                # is not computable from Neo4j alone (requires IcM data).
                 "critical_services": None,
                 "historical_outages_180d": None,
-                "open_icms": None,
+                "recent_active_outages": None,
                 "deployment_count_30d": None,
             },
             queries=tuple(queries),
@@ -148,19 +149,20 @@ def expand_evidence_for_resource(
         "service_name": service_name,
     }
 
-    services_impacted = 1 if isinstance(service_id, str) and service_id.strip() else 0
-    evidence["services_impacted"] = services_impacted
+    has_service_context = 1 if isinstance(service_id, str) and service_id.strip() else 0
+    # services_impacted intentionally NOT set here — cross-service blast radius
+    # requires historical incident data (IcM). Leave as unknown for scoring.
 
     # We don't currently have a deterministic "critical" field in the sample graph.
     evidence["critical_services"] = None
     unknowns.append("critical_services")
 
     # Incidents (used as outage history in this sample graph)
-    if services_impacted == 0:
+    if has_service_context == 0:
         evidence["historical_outages_180d"] = None
         unknowns.append("historical_outages_180d")
-        evidence["open_icms"] = None
-        unknowns.append("open_icms")
+        evidence["recent_active_outages"] = None
+        unknowns.append("recent_active_outages")
         evidence["recent_incidents"] = []
     else:
         inc_params = {"serviceId": service_id, "limit": limit_for("t3.service_incidents")}
@@ -199,11 +201,11 @@ def expand_evidence_for_resource(
                 )
 
         # The sample graph does not include a reliable open/closed status.
-        evidence["open_icms"] = None
-        unknowns.append("open_icms")
+        evidence["recent_active_outages"] = None
+        unknowns.append("recent_active_outages")
 
     # Deployments (no timestamp in sample data; provide sampled list and mark 30d as unknown)
-    if services_impacted == 0:
+    if has_service_context == 0:
         evidence["deployment_count_30d"] = None
         unknowns.append("deployment_count_30d")
         evidence["recent_deployments"] = []

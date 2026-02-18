@@ -157,8 +157,8 @@ data flow modes, and design decisions.
 
 | Category | Factors | Max Points |
 |----------|---------|------------|
-| Environment risk | Production penalty | 20 |
-| Blast radius | Services, critical services, subscriptions | 50 |
+| Environment risk | Production penalty | 0 (metadata only) |
+| Blast radius | Services, critical service, subscriptions | 40 |
 | Incident history | Outages, open IcMs, MTTM, recurrence | 37 |
 | Deployment signals | Frequency, stage failures | 25 |
 | Change characteristics | Destructive operations | 10 |

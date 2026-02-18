@@ -35,18 +35,18 @@ class KustoEvidenceProvider:
     run against that one client).
 
     Responsible evidence keys:
-    - open_icms
+    - recent_active_outages
     - avg_mttm_minutes
     - historical_outages_180d
     - related_incidents
     - deployment_count_30d
-    - deployment_stage_failures
+    - deployment_stage_failures (always unknown — poor proxy signal)
     - service_tree_id  (ServiceId from Service Tree)
     - service_subscriptions  (list of subscription dicts)
     - subscription_count
     - source_repos  (list of repo dicts from Service Tree)
     - repo_count  (number of source code repos registered)
-    - services_impacted  (blast radius: 1 when service is known)
+    - services_impacted  (blast radius: unknown until IcM cross-service query is implemented)
     - critical_services  (blast radius: from ServiceLevel/IsExternalFacing)
     - peer_resource_count  (blast radius: unknown without ARG)
     """
@@ -69,12 +69,13 @@ class KustoEvidenceProvider:
     # The KQL query IDs this provider is responsible for (scalar queries),
     # mapped to the evidence key each populates.
     _QUERY_MAP = {
-        "k1.open_icms": "open_icms",
+        "k1.recent_active_outages": "recent_active_outages",
         "k4.avg_mttm": "avg_mttm_minutes",
         "k5.outages_180d": "historical_outages_180d",
         "k6.related_incidents": "related_incidents",
         "k8.deployment_count_30d": "deployment_count_30d",
-        "k9.deployment_failures": "deployment_stage_failures",
+        # k9.deployment_failures removed — Abandoned/Rejected is a poor proxy
+        # for actual deployment failures. See follow-up bead.
     }
 
     def populate(
@@ -100,6 +101,7 @@ class KustoEvidenceProvider:
         if not service_name or not isinstance(service_name, str) or not service_name.strip():
             # No service context — mark service-dependent keys as unknown.
             service_keys = list(self._QUERY_MAP.values()) + [
+                "deployment_stage_failures",
                 "service_tree_id",
                 "service_subscriptions",
                 "subscription_count",
@@ -156,6 +158,11 @@ class KustoEvidenceProvider:
                 )
                 evidence.setdefault(evidence_key, None)
                 unknowns.append(evidence_key)
+
+        # deployment_stage_failures: always unknown until a better SafeFly
+        # signal is identified (Abandoned/Rejected != real failures).
+        evidence.setdefault("deployment_stage_failures", None)
+        unknowns.append("deployment_stage_failures")
 
         # --- Phase 2: Service Tree lookup (k7) → ServiceId + metadata ---
         service_id, service_meta = self._resolve_service_id(
@@ -299,7 +306,13 @@ class KustoEvidenceProvider:
                     for r in rows
                 ]
                 evidence["service_subscriptions"] = subscriptions
-                evidence["subscription_count"] = len(subscriptions)
+                # Only count production subscriptions for blast radius scoring.
+                prod_subs = [
+                    s for s in subscriptions
+                    if str(s.get("environment", "")).strip().lower()
+                    in ("production", "prod")
+                ]
+                evidence["subscription_count"] = len(prod_subs)
                 populated.extend(["service_subscriptions", "subscription_count"])
             else:
                 evidence["service_subscriptions"] = []
@@ -392,21 +405,20 @@ class KustoEvidenceProvider:
         """Derive blast radius evidence from Service Tree and ARG data.
 
         Evidence keys populated:
-        - ``services_impacted``: 1 when service context is available, 0
-          otherwise. In Kusto-only mode we resolve a single service,
-          so multi-service blast radius is not available.
+        - ``services_impacted``: left as unknown. Cross-service blast radius
+          requires historical IcM data (distinct services co-impacted in
+          past outages). Will be implemented via a dedicated KQL query.
         - ``critical_services``: list of service names whose ServiceLevel
           is high or that are external-facing (from k7 metadata).
         - ``peer_resource_count``: resolved via ARG when resource context is
           available (subscription + resource group); otherwise unknown.
         """
         # --- services_impacted ---
-        if service_name and isinstance(service_name, str) and service_name.strip():
-            evidence["services_impacted"] = 1
-            populated.append("services_impacted")
-        else:
-            evidence.setdefault("services_impacted", None)
-            unknowns.append("services_impacted")
+        # Cross-service blast radius requires historical IcM incident data
+        # (count of distinct services co-impacted in past outages).
+        # Not computable from service context alone; left as unknown.
+        evidence.setdefault("services_impacted", None)
+        unknowns.append("services_impacted")
 
         # --- critical_services ---
         if service_meta is not None:

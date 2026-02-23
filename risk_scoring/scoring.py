@@ -590,6 +590,42 @@ def score_change(
             )
         )
 
+    # Rule 13: SafeFly deployment-caused outages.
+    safefly_caused_outages = _require_int(evidence, "safefly_caused_outages_180d")
+    if safefly_caused_outages is None:
+        unknown("safefly_caused_outages_180d")
+        factors.append(
+            ScoreFactor(
+                factor_id="deployment.change_caused_outages",
+                title="SafeFly-caused outages (180d)",
+                status="unknown",
+                points=0,
+                max_points=15,
+                reason="safefly_caused_outages_180d is missing.",
+                evidence={"safefly_caused_outages_180d": None},
+            )
+        )
+    else:
+        if safefly_caused_outages >= 3:
+            pts = 15
+        elif safefly_caused_outages >= 2:
+            pts = 10
+        elif safefly_caused_outages == 1:
+            pts = 5
+        else:
+            pts = 0
+        factors.append(
+            ScoreFactor(
+                factor_id="deployment.change_caused_outages",
+                title="SafeFly-caused outages (180d)",
+                status="hit" if pts > 0 else "miss",
+                points=pts,
+                max_points=15,
+                reason="Sev1/2 outages caused by SafeFly deployments indicate high deployment risk.",
+                evidence={"safefly_caused_outages_180d": safefly_caused_outages},
+            )
+        )
+
     score = sum(f.points for f in factors)
     if score > 100:
         score = 100

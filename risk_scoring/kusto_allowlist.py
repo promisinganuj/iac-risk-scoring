@@ -156,6 +156,9 @@ _ICM_TABLE = "IncidentsSnapshotV2"
 # SafeFly deployment request table.
 _SAFEFLY_TABLE = "SafeFlyRequestCurrentMV"
 
+# IcM RootCauses table (same database as _ICM_TABLE).
+_ROOT_CAUSES_TABLE = "RootCauses"
+
 
 # ---------------------------------------------------------------------------
 # Allowlisted KQL queries — IcM / Outage
@@ -302,6 +305,36 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
         default_take=1,
         evidence_key="deployment_stage_failures",
         description="Count of abandoned or rejected SafeFly requests in the last 90 days.",
+    ),
+
+    # k14 — Sev1/Sev2 outages caused by SafeFly deployments (180 days)
+    "k14.safefly_caused_outages": KqlQuerySpec(
+        query_id="k14.safefly_caused_outages",
+        kql=(
+            f"{_ICM_TABLE}\n"
+            "| where OwningTenantName == {serviceName}\n"
+            "| where CreateDate >= ago(180d) and Severity <= 2\n"
+            f"| join kind=inner (\n"
+            f"    {_ROOT_CAUSES_TABLE}\n"
+            "    | where CreatedDate >= ago(180d) and IsCausedByChange == \"True\"\n"
+            "    | where AdditionalData != \"\" and AdditionalData != \"Additional data for root cause\" and AdditionalData != \"{}\"\n"
+            "    | summarize arg_max(ModifiedDate, *) by RootCauseId\n"
+            ") on RootCauseId\n"
+            "| extend additionalData = parse_json(AdditionalData)\n"
+            "| where isnotempty(tostring(additionalData.SafeflyRequestId))\n"
+            "        or isnotempty(tostring(additionalData.SafeflyId))\n"
+            "| summarize safefly_caused_outages_180d = dcount(IncidentId)\n"
+            "| take {take}"
+        ),
+        params=(_SERVICE_NAME_PARAM,),
+        source="icm",
+        max_take=1,
+        default_take=1,
+        evidence_key="safefly_caused_outages_180d",
+        description=(
+            "Count of Sev1/Sev2 outage incidents caused by SafeFly "
+            "deployments in the last 180 days (via IcM RootCauses join)."
+        ),
     ),
 }
 

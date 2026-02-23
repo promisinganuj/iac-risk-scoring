@@ -49,6 +49,7 @@ class KustoEvidenceProvider:
     - services_impacted  (blast radius: unknown until IcM cross-service query is implemented)
     - critical_services  (blast radius: from ServiceLevel/IsExternalFacing)
     - peer_resource_count  (blast radius: unknown without ARG)
+    - safefly_caused_outages_180d  (Sev1/2 outages caused by SafeFly deploys, 180d)
     """
 
     def __init__(
@@ -76,6 +77,7 @@ class KustoEvidenceProvider:
         "k8.deployment_count_30d": "deployment_count_30d",
         # k9.deployment_failures removed — Abandoned/Rejected is a poor proxy
         # for actual deployment failures. See follow-up bead.
+        "k14.safefly_caused_outages": "safefly_caused_outages_180d",
     }
 
     def populate(

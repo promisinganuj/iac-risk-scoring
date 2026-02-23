@@ -1,7 +1,7 @@
 """Snapshot-style determinism tests for scoring and report ordering.
 
 Covers gaps identified in iac-risk-scoring-8o9:
-- Full-evidence golden snapshot (all 13 factors populated)
+- Full-evidence golden snapshot (all 14 factors populated)
 - Factor ordering is stable across runs
 - Unknowns ordering is deterministic and sorted
 - _risk_level threshold boundaries
@@ -43,6 +43,7 @@ def _full_evidence(**overrides):
         "max_dependency_depth": 1,
         "peer_resource_count": 4,
         "related_incidents": 0,
+        "safefly_caused_outages_180d": 0,
     }
     base.update(overrides)
     return base
@@ -87,6 +88,7 @@ class TestFullEvidenceGoldenSnapshot(unittest.TestCase):
             "artifact.deep_deps",
             "resource.peer_impact",
             "incident.recurrence",
+            "deployment.change_caused_outages",
         ])
 
     def test_full_evidence_deterministic_across_runs(self):

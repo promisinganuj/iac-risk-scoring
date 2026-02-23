@@ -41,11 +41,13 @@ class TestScoringDeterminism(unittest.TestCase):
                 "artifact.deep_deps",
                 "resource.peer_impact",
                 "incident.recurrence",
+                "deployment.change_caused_outages",
             ],
         )
 
         # New factors should be unknown since evidence not provided
         self.assertIn("subscription_count", result.unknowns)
+        self.assertIn("safefly_caused_outages_180d", result.unknowns)
         self.assertIn("deployment_stage_failures", result.unknowns)
         self.assertIn("avg_mttm_minutes", result.unknowns)
         self.assertIn("max_dependency_depth", result.unknowns)

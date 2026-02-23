@@ -6,7 +6,7 @@
 
 ## Overview
 
-The scoring engine applies **14 deterministic rules** to pre-gathered
+The scoring engine applies **15 deterministic rules** to pre-gathered
 evidence. It performs no database queries — only arithmetic on evidence
 values. The same inputs always produce the same score.
 
@@ -204,6 +204,27 @@ cross-service blast radius from incident data.
 | 1 | 4 |
 | 0 | 0 |
 
+### 13. SafeFly-Caused Outages (180 days)
+
+| Factor | `deployment.change_caused_outages` |
+|--------|--------------------------------------|
+| Max points | 15 |
+| Evidence | `safefly_caused_outages_180d` (int) |
+
+| Threshold | Points |
+|-----------|--------|
+| ≥ 3 outages | 15 |
+| 2 | 10 |
+| 1 | 5 |
+| 0 | 0 |
+
+> **Business intent:** How many Sev1/Sev2 outage incidents in the last 180
+> days were caused by SafeFly deployments for this service? Joins IcM
+> `IncidentsSnapshotV2` with `RootCauses` (where `IsCausedByChange == "True"`)
+> and filters for root causes that contain SafeFly request metadata in
+> `AdditionalData`. A high count indicates deployment processes that
+> repeatedly cause production outages — a strong risk signal.
+
 ## Summary Table
 
 | # | Factor ID | Title | Max | Evidence Key(s) | Source |
@@ -221,7 +242,8 @@ cross-service blast radius from incident data.
 | 10 | `artifact.deep_deps` | Deep dependencies | 10 | `max_dependency_depth` | Neo4j |
 | 11 | `resource.peer_impact` | Peer resources | 8 | `peer_resource_count` | Neo4j / Kusto ARG (k13, when resource context exists) |
 | 12 | `incident.recurrence` | Incident recurrence | 12 | `related_incidents` | Kusto (k6) |
-| | | **Total possible** | **160** | | |
+| 13 | `deployment.change_caused_outages` | SafeFly-caused outages | 15 | `safefly_caused_outages_180d` | Kusto (k14) |
+| | | **Total possible** | **175** | | |
 
 > The maximum possible score exceeds 100; the engine caps at 100.
 > In practice, a service hitting every factor at max is extremely rare.
@@ -233,7 +255,7 @@ Evidence is gathered by pluggable providers before scoring runs:
 | Provider | Keys Populated |
 |----------|----------------|
 | `Neo4jEvidenceProvider` | `critical_services`, `max_dependency_depth`, `peer_resource_count`, `template_required_dependency_count`, `template_max_dependency_depth` |
-| `KustoEvidenceProvider` | `recent_active_outages`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count`, `services_impacted`, `critical_services`, `peer_resource_count` |
+| `KustoEvidenceProvider` | `recent_active_outages`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `safefly_caused_outages_180d`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count`, `services_impacted`, `critical_services`, `peer_resource_count` |
 
 The KQL queries are defined in `risk_scoring/kusto_allowlist.py`:
 
@@ -250,6 +272,7 @@ The KQL queries are defined in `risk_scoring/kusto_allowlist.py`:
 | `k11.repo_to_service` | `repo_service_mapping` | service_tree | Repo URL → ServiceId (reverse lookup) |
 | `k12.service_repos` | `source_repos` | service_tree | Service → registered source code repos |
 | `k13.arg_peer_resources` | `peer_resource_count` | arg | Resources in same resource group (provider excludes current resource) |
+| `k14.safefly_caused_outages` | `safefly_caused_outages_180d` | icm | Sev1/2 outages caused by SafeFly deployments (180d, via RootCauses join) |
 
 ## Unknowns
 

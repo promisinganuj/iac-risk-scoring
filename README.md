@@ -153,14 +153,14 @@ data flow modes, and design decisions.
 
 ## Scoring Model
 
-14 deterministic factors (model version `0.1`) across six categories:
+15 deterministic factors (model version `0.1`) across six categories:
 
 | Category | Factors | Max Points |
 |----------|---------|------------|
 | Environment risk | Production penalty | 0 (metadata only) |
 | Blast radius | Services, critical service, subscriptions | 40 |
 | Incident history | Outages, open IcMs, MTTM, recurrence | 37 |
-| Deployment signals | Frequency, stage failures | 25 |
+| Deployment signals | Frequency, stage failures, SafeFly-caused outages | 40 |
 | Change characteristics | Destructive operations | 10 |
 | Dependency depth | Artifacts, peers, templates | 28 |
 

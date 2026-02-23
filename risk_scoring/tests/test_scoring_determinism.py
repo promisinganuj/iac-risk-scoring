@@ -1,17 +1,6 @@
 """Snapshot-style determinism tests for scoring and report ordering.
 
-Covers gaps identified in iac-risk-scoring-8o9:
-- Full-evidence golden snapshot (all 14 factors populated)
-- Factor ordering is stable across runs
-- Unknowns ordering is deterministic and sorted
-- _risk_level threshold boundaries
-- _require_int / _require_str_list type-safety guards
-- Score capping at 100
-- ChangeContext normalization edge cases
-- JSON report key ordering and content snapshot
-- Markdown report contains expected sections
-- Report unknowns ordering
-- evidence_queries ordering
+Model v0.2: 10 factors, max 100 pts, all available in Kusto-only mode.
 """
 
 import json
@@ -30,20 +19,17 @@ from risk_scoring.scoring import ChangeContext, score_change
 
 
 def _full_evidence(**overrides):
-    """Return a full evidence dict with all factor keys populated."""
+    """Return a full evidence dict with all 10 factor keys populated."""
     base = {
-        "services_impacted": 2,
-        "critical_services": ["svc-alpha"],
         "subscription_count": 3,
         "historical_outages_180d": 1,
         "recent_active_outages": 0,
         "deployment_count_30d": 5,
-        "deployment_stage_failures": 1,
         "avg_mttm_minutes": 20,
-        "max_dependency_depth": 1,
         "peer_resource_count": 4,
         "related_incidents": 0,
         "safefly_caused_outages_180d": 0,
+        "sev12_incident_count": 1,
     }
     base.update(overrides)
     return base
@@ -63,11 +49,10 @@ class TestFullEvidenceGoldenSnapshot(unittest.TestCase):
 
         self.assertEqual(result.unknowns, ())
 
-        # env: 0, blast_radius.services: 10, critical: 5, subs: 4,
-        # outages: 5, active: 0, deps_30d: 0, destructive: 0,
-        # stage_failures: 5, mttm: 4, deep_deps: 0, peers: 3, recurrence: 0
-        self.assertEqual(result.risk_score, 36)
-        self.assertEqual(result.risk_level, "MEDIUM")
+        # safefly: 0, recurrence: 0, subs: 5, outages: 5, mttm: 4,
+        # deploys: 0, destructive: 0, severity: 3, peers: 3, active: 0 = 20
+        self.assertEqual(result.risk_score, 20)
+        self.assertEqual(result.risk_level, "LOW")
 
     def test_full_evidence_factor_ids_order_is_stable(self):
         change = ChangeContext.create(environment="prod")
@@ -75,25 +60,21 @@ class TestFullEvidenceGoldenSnapshot(unittest.TestCase):
 
         factor_ids = [f.factor_id for f in result.factors]
         self.assertEqual(factor_ids, [
-            "env.production",
-            "blast_radius.services",
-            "blast_radius.critical_services",
+            "deployment.change_caused_outages",
+            "incident.recurrence",
             "blast_radius.subscriptions",
             "history.outages_180d",
-            "ops.recent_active_outages",
+            "incident.mttm",
             "ops.deployments_30d",
             "change.destructive",
-            "deployment.stage_failures",
-            "incident.mttm",
-            "artifact.deep_deps",
+            "incident.severity_mix",
             "resource.peer_impact",
-            "incident.recurrence",
-            "deployment.change_caused_outages",
+            "ops.recent_active_outages",
         ])
 
     def test_full_evidence_deterministic_across_runs(self):
         change = ChangeContext.create(environment="prod", operations=["delete"])
-        evidence = _full_evidence(services_impacted=5)
+        evidence = _full_evidence(subscription_count=10)
         results = [score_change(change, evidence).to_dict() for _ in range(10)]
         for r in results[1:]:
             self.assertEqual(r, results[0])
@@ -105,10 +86,11 @@ class TestRiskLevelThresholds(unittest.TestCase):
     def test_score_0_is_low(self):
         change = ChangeContext.create(environment="dev")
         evidence = _full_evidence(
-            services_impacted=0, critical_services=[], subscription_count=0,
+            subscription_count=0,
             historical_outages_180d=0, recent_active_outages=0, deployment_count_30d=0,
-            deployment_stage_failures=0, avg_mttm_minutes=0, max_dependency_depth=0,
-            peer_resource_count=0, related_incidents=0,
+            avg_mttm_minutes=0,
+            peer_resource_count=0, related_incidents=0, sev12_incident_count=0,
+            safefly_caused_outages_180d=0,
         )
         result = score_change(change, evidence)
         self.assertEqual(result.risk_score, 0)
@@ -116,11 +98,15 @@ class TestRiskLevelThresholds(unittest.TestCase):
 
     def test_score_33_is_low(self):
         change = ChangeContext.create(environment="prod")
+        # safefly: 0, recurrence: 4(1), subs: 5(3), outages: 5(1), mttm: 4(20min),
+        # deploys: 5(10), destructive: 0, severity: 5(2), peers: 5(6), active: 0
+        # = 33
         evidence = _full_evidence(
-            services_impacted=2, critical_services=["svc"], subscription_count=3,
-            historical_outages_180d=1, recent_active_outages=0, deployment_count_30d=0,
-            deployment_stage_failures=1, avg_mttm_minutes=20,
-            max_dependency_depth=0, peer_resource_count=0, related_incidents=0,
+            subscription_count=3,
+            historical_outages_180d=1, recent_active_outages=0, deployment_count_30d=10,
+            avg_mttm_minutes=20, peer_resource_count=6,
+            related_incidents=1, sev12_incident_count=2,
+            safefly_caused_outages_180d=0,
         )
         result = score_change(change, evidence)
         self.assertEqual(result.risk_score, 33)
@@ -128,11 +114,15 @@ class TestRiskLevelThresholds(unittest.TestCase):
 
     def test_score_34_is_medium(self):
         change = ChangeContext.create(environment="prod")
+        # Same as above + 1 more point: add 1 active outage (+5) → 38
+        # But we need exactly 34. Let's use: subs=3(5) + outages=1(5) + deploys=10(5)
+        # + mttm=30(7) + severity=2(5) + recurrence=1(4) + peers=2(3) = 34
         evidence = _full_evidence(
-            services_impacted=2, critical_services=["svc"], subscription_count=3,
+            subscription_count=3,
             historical_outages_180d=1, recent_active_outages=0, deployment_count_30d=10,
-            deployment_stage_failures=1, avg_mttm_minutes=0,
-            max_dependency_depth=0, peer_resource_count=0, related_incidents=0,
+            avg_mttm_minutes=30, peer_resource_count=2,
+            related_incidents=1, sev12_incident_count=2,
+            safefly_caused_outages_180d=0,
         )
         result = score_change(change, evidence)
         self.assertEqual(result.risk_score, 34)
@@ -145,10 +135,11 @@ class TestScoreCapping(unittest.TestCase):
     def test_maxed_out_evidence_caps_at_100(self):
         change = ChangeContext.create(environment="prod", operations=["delete"])
         evidence = _full_evidence(
-            services_impacted=10, critical_services=["svc"], subscription_count=10,
+            subscription_count=10,
             historical_outages_180d=5, recent_active_outages=1, deployment_count_30d=20,
-            deployment_stage_failures=3, avg_mttm_minutes=60, max_dependency_depth=3,
+            avg_mttm_minutes=60,
             peer_resource_count=10, related_incidents=3,
+            safefly_caused_outages_180d=3, sev12_incident_count=3,
         )
         result = score_change(change, evidence)
         self.assertLessEqual(result.risk_score, 100)
@@ -161,27 +152,28 @@ class TestEvidenceTypeSafety(unittest.TestCase):
 
     def test_bool_evidence_rejected_as_int(self):
         change = ChangeContext.create(environment="prod")
-        evidence = _full_evidence(services_impacted=True)
+        evidence = _full_evidence(subscription_count=True)
         with self.assertRaises(TypeError) as ctx:
             score_change(change, evidence)
         self.assertIn("bool", str(ctx.exception))
 
     def test_string_evidence_rejected_as_int(self):
         change = ChangeContext.create(environment="prod")
-        evidence = _full_evidence(services_impacted="3")
+        evidence = _full_evidence(subscription_count="3")
         with self.assertRaises(TypeError):
             score_change(change, evidence)
 
-    def test_int_evidence_rejected_as_str_list(self):
+    def test_int_rejected_as_int_for_sev12(self):
+        """Verify that bool values are rejected for sev12_incident_count."""
         change = ChangeContext.create(environment="prod")
-        evidence = _full_evidence(critical_services=42)
+        evidence = _full_evidence(sev12_incident_count=True)
         with self.assertRaises(TypeError) as ctx:
             score_change(change, evidence)
-        self.assertIn("list[str]", str(ctx.exception))
+        self.assertIn("bool", str(ctx.exception))
 
-    def test_list_of_ints_rejected_as_str_list(self):
+    def test_string_rejected_for_sev12(self):
         change = ChangeContext.create(environment="prod")
-        evidence = _full_evidence(critical_services=[1, 2, 3])
+        evidence = _full_evidence(sev12_incident_count="3")
         with self.assertRaises(TypeError):
             score_change(change, evidence)
 
@@ -362,7 +354,7 @@ class TestToDictDeterminism(unittest.TestCase):
 
     def test_partial_evidence(self):
         change = ChangeContext.create(environment="staging")
-        ev = {"services_impacted": 1, "deployment_count_30d": 15}
+        ev = {"subscription_count": 1, "deployment_count_30d": 15}
         r1 = score_change(change, ev).to_dict()
         r2 = score_change(change, ev).to_dict()
         self.assertEqual(r1, r2)

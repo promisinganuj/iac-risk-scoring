@@ -336,6 +336,25 @@ KQL_ALLOWLIST: Dict[str, KqlQuerySpec] = {
             "deployments in the last 180 days (via IcM RootCauses join)."
         ),
     ),
+
+    # k15 — Count of Sev1/Sev2 incidents in the last 180 days (severity mix)
+    "k15.sev12_incidents": KqlQuerySpec(
+        query_id="k15.sev12_incidents",
+        kql=(
+            f"{_ICM_TABLE}\n"
+            "| where OwningTenantName == {serviceName}\n"
+            "| where CreateDate > ago(180d)\n"
+            "| where Severity <= 2\n"
+            "| summarize sev12_incident_count = count()\n"
+            "| take {take}"
+        ),
+        params=(_SERVICE_NAME_PARAM,),
+        source="icm",
+        max_take=1,
+        default_take=1,
+        evidence_key="sev12_incident_count",
+        description="Count of Sev1/Sev2 incidents in the last 180 days.",
+    ),
 }
 
 

@@ -1,8 +1,10 @@
 """Tests for blast radius via Kusto joins (no Neo4j).
 
 Validates that the Kusto evidence provider correctly populates
-blast radius evidence keys (services_impacted, critical_services,
-peer_resource_count) from Service Tree data instead of Neo4j.
+blast radius evidence keys (peer_resource_count, subscription_count)
+from Service Tree / ARG data.
+
+Model v0.2: removed services_impacted and critical_services factors.
 """
 
 from __future__ import annotations
@@ -38,7 +40,7 @@ class FakeKustoClient:
 
 
 # =====================================================================
-# Helper: standard responses for k1-k9 scalar queries
+# Helper: standard responses for scalar queries
 # =====================================================================
 
 _SCALAR_ZEROS: dict[str, list[dict]] = {
@@ -50,177 +52,7 @@ _SCALAR_ZEROS: dict[str, list[dict]] = {
 
 
 # =====================================================================
-# services_impacted via Kusto
-# =====================================================================
-
-
-class TestServicesImpacted(unittest.TestCase):
-    """services_impacted should be 1 when service_name is known, None otherwise."""
-
-    def _resolved(self, name: str = "Payments") -> ResolvedEntityRef:
-        return ResolvedEntityRef(
-            label="Service", resource_id=name, display_name=name
-        )
-
-    def _make_provider(self, responses: dict) -> KustoEvidenceProvider:
-        return KustoEvidenceProvider(FakeKustoClient(responses))
-
-    def test_services_impacted_always_unknown(self):
-        """services_impacted requires IcM cross-service blast radius data; always unknown from provider."""
-        provider = self._make_provider(
-            {
-                **_SCALAR_ZEROS,
-                "GetServicesByName": [
-                    {
-                        "ServiceId": "abc-123",
-                        "ServiceName": "Payments",
-                        "ServiceLevel": "3",
-                        "IsExternalFacing": False,
-                    }
-                ],
-                "GetSubscriptionsAssociatedWith": [],
-                "GetServicesMetadataValues": [],
-            }
-        )
-        evidence: dict = {"service_name": "Payments"}
-        result = provider.populate(self._resolved(), evidence)
-
-        self.assertIsNone(evidence.get("services_impacted"))
-        self.assertIn("services_impacted", result.unknown_keys)
-
-    def test_services_impacted_unknown_without_service_name(self):
-        provider = self._make_provider({})
-        evidence: dict = {}
-        result = provider.populate(self._resolved(), evidence)
-
-        self.assertIsNone(evidence.get("services_impacted"))
-        self.assertIn("services_impacted", result.unknown_keys)
-
-    def test_services_impacted_unknown_with_empty_service_name(self):
-        provider = self._make_provider({})
-        evidence: dict = {"service_name": "   "}
-        result = provider.populate(self._resolved(), evidence)
-
-        self.assertIsNone(evidence.get("services_impacted"))
-        self.assertIn("services_impacted", result.unknown_keys)
-
-
-# =====================================================================
-# critical_services via k7 ServiceLevel / IsExternalFacing
-# =====================================================================
-
-
-class TestCriticalServices(unittest.TestCase):
-    """critical_services should be derived from k7 Service Tree metadata."""
-
-    def _resolved(self, name: str = "Payments") -> ResolvedEntityRef:
-        return ResolvedEntityRef(
-            label="Service", resource_id=name, display_name=name
-        )
-
-    def _make_provider(self, responses: dict) -> KustoEvidenceProvider:
-        return KustoEvidenceProvider(FakeKustoClient(responses))
-
-    def _base_responses(self, **k7_overrides) -> dict:
-        row = {
-            "ServiceId": "abc-123",
-            "ServiceName": "Payments",
-            "ServiceLevel": "3",
-            "IsExternalFacing": False,
-            **k7_overrides,
-        }
-        return {
-            **_SCALAR_ZEROS,
-            "GetServicesByName": [row],
-            "GetSubscriptionsAssociatedWith": [],
-            "GetServicesMetadataValues": [],
-        }
-
-    def test_external_facing_service_is_critical(self):
-        provider = self._make_provider(
-            self._base_responses(IsExternalFacing=True)
-        )
-        evidence: dict = {"service_name": "Payments"}
-        provider.populate(self._resolved(), evidence)
-
-        self.assertEqual(evidence["critical_services"], ["Payments"])
-
-    def test_high_service_level_1_is_critical(self):
-        provider = self._make_provider(
-            self._base_responses(ServiceLevel="1")
-        )
-        evidence: dict = {"service_name": "Payments"}
-        provider.populate(self._resolved(), evidence)
-
-        self.assertEqual(evidence["critical_services"], ["Payments"])
-
-    def test_high_service_level_2_is_critical(self):
-        provider = self._make_provider(
-            self._base_responses(ServiceLevel="2")
-        )
-        evidence: dict = {"service_name": "Payments"}
-        provider.populate(self._resolved(), evidence)
-
-        self.assertEqual(evidence["critical_services"], ["Payments"])
-
-    def test_ring_0_label_is_critical(self):
-        provider = self._make_provider(
-            self._base_responses(ServiceLevel="Ring 0")
-        )
-        evidence: dict = {"service_name": "Payments"}
-        provider.populate(self._resolved(), evidence)
-
-        self.assertEqual(evidence["critical_services"], ["Payments"])
-
-    def test_ring_1_label_is_critical(self):
-        provider = self._make_provider(
-            self._base_responses(ServiceLevel="Ring 1")
-        )
-        evidence: dict = {"service_name": "Payments"}
-        provider.populate(self._resolved(), evidence)
-
-        self.assertEqual(evidence["critical_services"], ["Payments"])
-
-    def test_non_critical_service_returns_empty_list(self):
-        provider = self._make_provider(
-            self._base_responses(ServiceLevel="3", IsExternalFacing=False)
-        )
-        evidence: dict = {"service_name": "Payments"}
-        result = provider.populate(self._resolved(), evidence)
-
-        self.assertEqual(evidence["critical_services"], [])
-        self.assertIn("critical_services", result.populated_keys)
-
-    def test_critical_services_unknown_when_k7_fails(self):
-        """If k7 returns no rows, critical_services should be unknown."""
-        provider = self._make_provider(
-            {
-                **_SCALAR_ZEROS,
-                "GetServicesByName": [],  # No match
-            }
-        )
-        evidence: dict = {"service_name": "Unknown Service"}
-        result = provider.populate(
-            self._resolved("Unknown Service"), evidence
-        )
-
-        self.assertIsNone(evidence.get("critical_services"))
-        self.assertIn("critical_services", result.unknown_keys)
-
-    def test_both_external_and_high_level(self):
-        """External-facing AND high service level should still produce one entry."""
-        provider = self._make_provider(
-            self._base_responses(ServiceLevel="1", IsExternalFacing=True)
-        )
-        evidence: dict = {"service_name": "Payments"}
-        provider.populate(self._resolved(), evidence)
-
-        self.assertEqual(evidence["critical_services"], ["Payments"])
-        self.assertEqual(len(evidence["critical_services"]), 1)
-
-
-# =====================================================================
-# peer_resource_count (always unknown in Kusto-only mode)
+# peer_resource_count (from ARG when resource context exists)
 # =====================================================================
 
 
@@ -327,26 +159,20 @@ class TestKustoBlastRadiusScoring(unittest.TestCase):
 
     def _score_with_kusto_evidence(
         self,
-        services_impacted: int | None = 1,
-        critical_services: list[str] | None = None,
         subscription_count: int | None = 5,
         peer_resource_count: int | None = None,
     ) -> dict:
         """Build evidence as the Kusto provider would, run scorer, return factors."""
-        if critical_services is None:
-            critical_services = []
-
         evidence = {
-            "services_impacted": services_impacted,
-            "critical_services": critical_services,
             "subscription_count": subscription_count,
             "peer_resource_count": peer_resource_count,
             "historical_outages_180d": 0,
             "recent_active_outages": 0,
             "deployment_count_30d": 5,
-            "deployment_stage_failures": 0,
             "avg_mttm_minutes": 10,
             "related_incidents": 0,
+            "safefly_caused_outages_180d": 0,
+            "sev12_incident_count": 0,
         }
         change = ChangeContext.create(environment="prod")
         result = score_change(change, evidence)
@@ -357,34 +183,8 @@ class TestKustoBlastRadiusScoring(unittest.TestCase):
             "unknowns": result.unknowns,
         }
 
-    def test_services_impacted_1_scores_5pts(self):
-        r = self._score_with_kusto_evidence(services_impacted=1)
-        f = r["factors"]["blast_radius.services"]
-        self.assertEqual(f.points, 5)
-        self.assertEqual(f.status, "hit")
-
-    def test_services_impacted_none_is_unknown(self):
-        r = self._score_with_kusto_evidence(services_impacted=None)
-        f = r["factors"]["blast_radius.services"]
-        self.assertEqual(f.status, "unknown")
-        self.assertEqual(f.points, 0)
-
-    def test_critical_service_hits_15pts(self):
-        r = self._score_with_kusto_evidence(
-            critical_services=["Payments"]
-        )
-        f = r["factors"]["blast_radius.critical_services"]
-        self.assertEqual(f.points, 5)
-        self.assertEqual(f.status, "hit")
-
-    def test_empty_critical_services_is_miss(self):
-        r = self._score_with_kusto_evidence(critical_services=[])
-        f = r["factors"]["blast_radius.critical_services"]
-        self.assertEqual(f.points, 0)
-        self.assertEqual(f.status, "miss")
-
     def test_peer_resource_count_none_is_unknown(self):
-        """Kusto-only mode: peer_resource_count is always unknown."""
+        """Kusto-only mode: peer_resource_count is always unknown without ARG."""
         r = self._score_with_kusto_evidence(peer_resource_count=None)
         f = r["factors"]["resource.peer_impact"]
         self.assertEqual(f.status, "unknown")
@@ -393,34 +193,43 @@ class TestKustoBlastRadiusScoring(unittest.TestCase):
     def test_subscription_count_flows_through(self):
         r = self._score_with_kusto_evidence(subscription_count=5)
         f = r["factors"]["blast_radius.subscriptions"]
-        self.assertEqual(f.points, 7)
+        self.assertEqual(f.points, 8)
         self.assertEqual(f.status, "hit")
+
+    def test_subscription_count_10_plus_max(self):
+        r = self._score_with_kusto_evidence(subscription_count=10)
+        f = r["factors"]["blast_radius.subscriptions"]
+        self.assertEqual(f.points, 12)
+        self.assertEqual(f.status, "hit")
+
+    def test_subscription_count_2_subs(self):
+        r = self._score_with_kusto_evidence(subscription_count=2)
+        f = r["factors"]["blast_radius.subscriptions"]
+        self.assertEqual(f.points, 5)
+
+    def test_subscription_count_1_sub(self):
+        r = self._score_with_kusto_evidence(subscription_count=1)
+        f = r["factors"]["blast_radius.subscriptions"]
+        self.assertEqual(f.points, 2)
 
     def test_full_kusto_only_score_is_deterministic(self):
         """Same inputs should always produce the same score."""
         r1 = self._score_with_kusto_evidence(
-            services_impacted=1,
-            critical_services=["Payments"],
             subscription_count=3,
             peer_resource_count=None,
         )
         r2 = self._score_with_kusto_evidence(
-            services_impacted=1,
-            critical_services=["Payments"],
             subscription_count=3,
             peer_resource_count=None,
         )
         self.assertEqual(r1["score"], r2["score"])
 
     def test_no_service_all_blast_radius_unknown(self):
-        """When services_impacted is None, blast_radius.services is unknown."""
+        """When subscription_count is None, blast_radius.subscriptions is unknown."""
         r = self._score_with_kusto_evidence(
-            services_impacted=None,
-            critical_services=None,
             subscription_count=None,
             peer_resource_count=None,
         )
-        self.assertIn("services_impacted", r["unknowns"])
         self.assertIn("subscription_count", r["unknowns"])
         self.assertIn("peer_resource_count", r["unknowns"])
 
@@ -438,8 +247,8 @@ class TestKustoProviderPipeline(unittest.TestCase):
             label="Service", resource_id=name, display_name=name
         )
 
-    def test_critical_external_service_increases_score(self):
-        """External-facing service should add critical_services points."""
+    def test_subscription_count_contributes_to_score(self):
+        """Two prod subscriptions should score blast_radius.subscriptions."""
         provider = KustoEvidenceProvider(
             FakeKustoClient(
                 {
@@ -480,19 +289,10 @@ class TestKustoProviderPipeline(unittest.TestCase):
 
         factors = {f.factor_id: f for f in result.factors}
 
-        # services_impacted is unknown (cross-service blast radius not yet implemented)
-        self.assertEqual(
-            factors["blast_radius.services"].status, "unknown"
-        )
-        self.assertEqual(
-            factors["blast_radius.services"].points, 0
-        )
-        self.assertEqual(
-            factors["blast_radius.critical_services"].points, 5
-        )  # critical
+        # 1 prod sub → 2 pts
         self.assertEqual(
             factors["blast_radius.subscriptions"].points, 2
-        )  # 1 prod sub = 2pts
+        )
         self.assertEqual(
             factors["resource.peer_impact"].status, "unknown"
         )  # no ARG
@@ -537,8 +337,8 @@ class TestKustoProviderPipeline(unittest.TestCase):
         self.assertEqual(factors["resource.peer_impact"].points, 8)
         self.assertEqual(factors["resource.peer_impact"].status, "hit")
 
-    def test_non_critical_service_no_extra_points(self):
-        """Internal, low-level service should NOT add critical points."""
+    def test_non_critical_service_minimal_score(self):
+        """Internal, low-level service with zero evidence should have a low score."""
         provider = KustoEvidenceProvider(
             FakeKustoClient(
                 {
@@ -565,13 +365,12 @@ class TestKustoProviderPipeline(unittest.TestCase):
 
         factors = {f.factor_id: f for f in result.factors}
 
-        # Not prod, not critical
-        self.assertEqual(factors["env.production"].points, 0)
+        # No subs, no outages, no incidents → minimal score
         self.assertEqual(
-            factors["blast_radius.critical_services"].points, 0
+            factors["blast_radius.subscriptions"].points, 0
         )
         self.assertEqual(
-            factors["blast_radius.critical_services"].status, "miss"
+            factors["blast_radius.subscriptions"].status, "miss"
         )
 
 

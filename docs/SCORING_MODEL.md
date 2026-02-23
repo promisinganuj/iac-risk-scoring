@@ -1,285 +1,148 @@
-# Scoring Model Reference
+# Risk Scoring Model v0.2
 
-> **Model version:** `0.1`
-> **Score range:** 0–100
-> **Levels:** LOW (0–33), MEDIUM (34–66), HIGH (67–100)
+Deterministic, evidence-based scoring for IaC change risk assessment.
 
-## Overview
+## Design Principles
 
-The scoring engine applies **15 deterministic rules** to pre-gathered
-evidence. It performs no database queries — only arithmetic on evidence
-values. The same inputs always produce the same score.
+1. **Deterministic** — same inputs always produce the same score.
+2. **Evidence-based** — every point is traceable to a specific data source.
+3. **Kusto-first** — all 10 factors are available in Kusto-only mode (no Neo4j required).
+4. **No cap needed** — factors sum to exactly 100 maximum.
 
-Each rule produces a `ScoreFactor` with:
+## Risk Levels
 
-| Field | Description |
-|-------|-------------|
-| `factor_id` | Stable identifier (e.g. `env.production`) |
-| `status` | `hit` (points awarded), `miss` (0 points), `unknown` (evidence missing), `na` (not applicable) |
-| `points` | Points awarded (0 to `max_points`) |
-| `max_points` | Maximum possible points for this factor |
-| `evidence` | The evidence values used for the decision |
+| Score Range | Level   |
+|-------------|---------|
+| 0–33        | LOW     |
+| 34–66       | MEDIUM  |
+| 67–100      | HIGH    |
 
-The total score is `sum(factor.points)`, capped at 100.
+## Factors (10 total, max 100 pts)
 
-## Factors
+| # | Factor ID | Title | Max Pts | Evidence Key | Source |
+|---|-----------|-------|---------|--------------|--------|
+| 1 | `deployment.change_caused_outages` | SafeFly-caused outages (180d) | 15 | `safefly_caused_outages_180d` | SafeFly/IcM (k14) |
+| 2 | `incident.recurrence` | Similar past incidents | 12 | `related_incidents` | IcM (k6) |
+| 3 | `blast_radius.subscriptions` | Blast radius (subscriptions) | 12 | `subscription_count` | Service Tree (k10) |
+| 4 | `history.outages_180d` | Recent outages (180d) | 10 | `historical_outages_180d` | IcM (k5) |
+| 5 | `incident.mttm` | Slow incident mitigation | 10 | `avg_mttm_minutes` | IcM (k4) |
+| 6 | `ops.deployments_30d` | Deployment frequency (30d) | 10 | `deployment_count_30d` | SafeFly (k8) |
+| 7 | `change.destructive` | Destructive operations | 10 | `operations` (from ChangeContext) | Caller input |
+| 8 | `incident.severity_mix` | High-severity incidents (Sev1/2, 180d) | 8 | `sev12_incident_count` | IcM (k15) |
+| 9 | `resource.peer_impact` | Resources in same ResourceGroup | 8 | `peer_resource_count` | ARG (k13) |
+| 10 | `ops.recent_active_outages` | Recent active outages (7d) | 5 | `recent_active_outages` | IcM (k1) |
 
-### 1. Environment Risk
+**Total maximum: 100 pts**
 
-| Factor | `env.production` |
-|--------|-------------------|
-| Max points | 20 |
-| Evidence | `change.environment` |
-| Logic | `prod` → 20 pts; anything else → 0 pts; missing → unknown |
+## Scoring Thresholds
 
-### 2. Blast Radius — Services Impacted
+### Rule 1: SafeFly-caused outages (15 pts)
 
-| Factor | `blast_radius.services` |
-|--------|--------------------------|
-| Max points | 25 |
-| Evidence | `services_impacted` (int) |
-| Status | **Currently unknown** — requires IcM cross-service blast radius query (not yet implemented) |
-
-**Business intent:** How many distinct services were historically co-impacted
-in outages caused by deployments of this service? This measures the
-cross-service blast radius from incident data.
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 5 services | 25 |
-| ≥ 3 | 18 |
-| 2 | 10 |
-| 1 | 5 |
-| 0 | 0 |
+| `safefly_caused_outages_180d >= 3` | 15 |
+| `>= 2` | 10 |
+| `== 1` | 5 |
+| `== 0` | 0 |
 
-> **Note:** The graduated thresholds represent the target design. Neither
-> the Neo4j nor Kusto provider currently populates this evidence key —
-> it will be implemented via a dedicated KQL query against IcM incident
-> data that counts distinct co-impacted services.
+### Rule 2: Incident recurrence (12 pts)
 
-### 3. Blast Radius — Critical Services
-
-| Factor | `blast_radius.critical_services` |
-|--------|-----------------------------------|
-| Max points | 15 |
-| Evidence | `critical_services` (list of strings) |
-| Logic | Any critical service impacted → 15 pts; empty list → 0 pts |
-
-### 3b. Blast Radius — Subscriptions
-
-| Factor | `blast_radius.subscriptions` |
-|--------|-------------------------------|
-| Max points | 10 |
-| Evidence | `subscription_count` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 10 subscriptions | 10 |
-| ≥ 5 | 7 |
-| ≥ 2 | 4 |
-| 1 | 2 |
-| 0 | 0 |
+| `related_incidents >= 3` | 12 |
+| `>= 2` | 8 |
+| `== 1` | 4 |
+| `== 0` | 0 |
 
-> Subscription count is resolved via Service Tree
-> `GetSubscriptionsAssociatedWith()` through the KustoEvidenceProvider
-> (phase 2: k7 → ServiceId, phase 3: k10 → subscriptions).
-> **Only production subscriptions are counted** (environment = "Production" or "Prod").
+### Rule 3: Blast radius — subscriptions (12 pts)
 
-### 4. Recent Outages (180 days)
-
-| Factor | `history.outages_180d` |
-|--------|-------------------------|
-| Max points | 10 |
-| Evidence | `historical_outages_180d` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 2 outages | 10 |
-| 1 | 5 |
-| 0 | 0 |
+| `subscription_count >= 10` | 12 |
+| `>= 5` | 8 |
+| `>= 2` | 5 |
+| `== 1` | 2 |
+| `== 0` | 0 |
 
-### 5. Recent Active Outages (7 days)
+### Rule 4: Recent outages (10 pts)
 
-| Factor | `ops.recent_active_outages` |
-|--------|-------------------------------|
-| Max points | 5 |
-| Evidence | `recent_active_outages` (int) |
-| Logic | Any active outage in last 7d → 5 pts; 0 → 0 pts |
-
-> Query filters: `CreateDate >= ago(7d)`, `Status == "ACTIVE"`, `IsOutage == true`.
-
-### 6. Deployment Frequency (30 days)
-
-| Factor | `ops.deployments_30d` |
-|--------|------------------------|
-| Max points | 10 |
-| Evidence | `deployment_count_30d` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 20 deployments | 10 |
-| ≥ 10 | 5 |
-| < 10 | 0 |
+| `historical_outages_180d >= 2` | 10 |
+| `== 1` | 5 |
+| `== 0` | 0 |
 
-### 7. Destructive Operations
+### Rule 5: Slow incident mitigation — MTTM (10 pts)
 
-| Factor | `change.destructive` |
-|--------|------------------------|
-| Max points | 10 |
-| Evidence | `change.operations` (list of strings) |
-| Logic | Any `delete` or `destroy` operation → 10 pts; otherwise → 0 pts |
-| Note | Status is `na` (not unknown) if no operations are provided |
-
-### 8. Deployment Stage Failures
-
-| Factor | `deployment.stage_failures` |
-|--------|------------------------------|
-| Max points | 15 |
-| Evidence | `deployment_stage_failures` (int) |
-| Status | **Currently unknown** — Abandoned/Rejected SafeFly status is a poor proxy for actual deployment failures. Thresholds retained for future use. |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 3 failures | 15 |
-| 2 | 10 |
-| 1 | 5 |
-| 0 | 0 |
+| `avg_mttm_minutes >= 60` | 10 |
+| `>= 30` | 7 |
+| `>= 15` | 4 |
+| `< 15` | 0 |
 
-> **Note**: The k9 query counting Abandoned/Rejected SafeFly requests has been
-> disabled. A better signal (e.g., actual rollbacks, failed stages) needs to be
-> identified before this factor can contribute to the score.
+### Rule 6: Deployment frequency (10 pts)
 
-### 9. Slow Incident Mitigation (MTTM)
-
-| Factor | `incident.mttm` |
-|--------|-------------------|
-| Max points | 10 |
-| Evidence | `avg_mttm_minutes` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 60 minutes | 10 |
-| ≥ 30 | 7 |
-| ≥ 15 | 4 |
-| < 15 | 0 |
+| `deployment_count_30d >= 20` | 10 |
+| `>= 10` | 5 |
+| `< 10` | 0 |
 
-### 10. Deep Artifact Dependencies
+### Rule 7: Destructive operations (10 pts)
 
-| Factor | `artifact.deep_deps` |
-|--------|------------------------|
-| Max points | 10 |
-| Evidence | `max_dependency_depth` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 3 levels | 10 |
-| 2 | 5 |
-| ≤ 1 | 0 |
+| Any operation in `{delete, destroy}` | 10 |
+| Otherwise | 0 |
+| No operations provided | `na` (0 pts) |
 
-### 11. Peer Resources in Same ResourceGroup
+### Rule 8: Incident severity mix (8 pts)
 
-| Factor | `resource.peer_impact` |
-|--------|-------------------------|
-| Max points | 8 |
-| Evidence | `peer_resource_count` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 10 peers | 8 |
-| ≥ 5 | 5 |
-| ≥ 2 | 3 |
-| < 2 | 0 |
+| `sev12_incident_count >= 3` | 8 |
+| `>= 2` | 5 |
+| `== 1` | 3 |
+| `== 0` | 0 |
 
-### 12. Incident Recurrence
+### Rule 9: Peer resource impact (8 pts)
 
-| Factor | `incident.recurrence` |
-|--------|------------------------|
-| Max points | 12 |
-| Evidence | `related_incidents` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 3 related | 12 |
-| 2 | 8 |
-| 1 | 4 |
-| 0 | 0 |
+| `peer_resource_count >= 10` | 8 |
+| `>= 5` | 5 |
+| `>= 2` | 3 |
+| `< 2` | 0 |
 
-### 13. SafeFly-Caused Outages (180 days)
+### Rule 10: Recent active outages (5 pts)
 
-| Factor | `deployment.change_caused_outages` |
-|--------|--------------------------------------|
-| Max points | 15 |
-| Evidence | `safefly_caused_outages_180d` (int) |
-
-| Threshold | Points |
+| Condition | Points |
 |-----------|--------|
-| ≥ 3 outages | 15 |
-| 2 | 10 |
-| 1 | 5 |
-| 0 | 0 |
+| `recent_active_outages > 0` | 5 |
+| `== 0` | 0 |
 
-> **Business intent:** How many Sev1/Sev2 outage incidents in the last 180
-> days were caused by SafeFly deployments for this service? Joins IcM
-> `IncidentsSnapshotV2` with `RootCauses` (where `IsCausedByChange == "True"`)
-> and filters for root causes that contain SafeFly request metadata in
-> `AdditionalData`. A high count indicates deployment processes that
-> repeatedly cause production outages — a strong risk signal.
+## Unknown Handling
 
-## Summary Table
+When an evidence key is missing (`None`), the factor status is `"unknown"` and contributes 0 points. Unknown evidence keys are collected and reported in `ScoreResult.unknowns`.
 
-| # | Factor ID | Title | Max | Evidence Key(s) | Source |
-|---|-----------|-------|-----|-----------------|--------|
-| 1 | `env.production` | Production environment | 20 | `change.environment` | Change context |
-| 2 | `blast_radius.services` | Services impacted | 25 | `services_impacted` | Neo4j / Kusto |
-| 3 | `blast_radius.critical_services` | Critical service | 5 | `critical_services` | Kusto (k7) |
-| 3b | `blast_radius.subscriptions` | Subscriptions | 10 | `subscription_count` | Kusto (k10) |
-| 4 | `history.outages_180d` | Recent outages | 10 | `historical_outages_180d` | Kusto (k5) |
-| 5 | `ops.recent_active_outages` | Recent active outages (7d) | 5 | `recent_active_outages` | Kusto (k1) |
-| 6 | `ops.deployments_30d` | Deploy frequency | 10 | `deployment_count_30d` | Kusto (k8) |
-| 7 | `change.destructive` | Destructive ops | 10 | `change.operations` | Change context |
-| 8 | `deployment.stage_failures` | Stage failures | 15 | `deployment_stage_failures` | Kusto (k9) |
-| 9 | `incident.mttm` | Slow mitigation | 10 | `avg_mttm_minutes` | Kusto (k4) |
-| 10 | `artifact.deep_deps` | Deep dependencies | 10 | `max_dependency_depth` | Neo4j |
-| 11 | `resource.peer_impact` | Peer resources | 8 | `peer_resource_count` | Neo4j / Kusto ARG (k13, when resource context exists) |
-| 12 | `incident.recurrence` | Incident recurrence | 12 | `related_incidents` | Kusto (k6) |
-| 13 | `deployment.change_caused_outages` | SafeFly-caused outages | 15 | `safefly_caused_outages_180d` | Kusto (k14) |
-| | | **Total possible** | **175** | | |
+## Changes from v0.1
 
-> The maximum possible score exceeds 100; the engine caps at 100.
-> In practice, a service hitting every factor at max is extremely rare.
+### Removed factors (5)
+| Factor | Reason |
+|--------|--------|
+| `env.production` (0 pts) | Always scored 0 — provided no signal |
+| `blast_radius.services` (25 pts) | `services_impacted` was always unknown |
+| `blast_radius.critical_services` (5 pts) | Folded into service metadata; not actionable as a separate factor |
+| `deployment.stage_failures` (15 pts) | `deployment_stage_failures` was always unknown |
+| `artifact.deep_deps` (10 pts) | Required Neo4j; not available in Kusto-only mode |
 
-## Evidence Sources
+### Added factor (1)
+| Factor | Points | Description |
+|--------|--------|-------------|
+| `incident.severity_mix` | 8 | Count of Sev1/Sev2 incidents (180d) via k15 KQL query |
 
-Evidence is gathered by pluggable providers before scoring runs:
-
-| Provider | Keys Populated |
-|----------|----------------|
-| `Neo4jEvidenceProvider` | `critical_services`, `max_dependency_depth`, `peer_resource_count`, `template_required_dependency_count`, `template_max_dependency_depth` |
-| `KustoEvidenceProvider` | `recent_active_outages`, `avg_mttm_minutes`, `historical_outages_180d`, `related_incidents`, `deployment_count_30d`, `deployment_stage_failures`, `safefly_caused_outages_180d`, `service_tree_id`, `service_subscriptions`, `subscription_count`, `source_repos`, `repo_count`, `services_impacted`, `critical_services`, `peer_resource_count` |
-
-The KQL queries are defined in `risk_scoring/kusto_allowlist.py`:
-
-| Query ID | Evidence Key | Kusto Source | Description |
-|----------|-------------|--------------|-------------|
-| `k1.recent_active_outages` | `recent_active_outages` | icm | Recent active outage incidents (7d) |
-| `k4.avg_mttm` | `avg_mttm_minutes` | icm | Avg mitigation time (180d) |
-| `k5.outages_180d` | `historical_outages_180d` | icm | Outage count (180d) |
-| `k6.related_incidents` | `related_incidents` | icm | Parent-linked clusters (90d) |
-| `k7.service_tree_lookup` | `service_tree_id` | service_tree | Service name → ServiceId |
-| `k8.deployment_count_30d` | `deployment_count_30d` | safefly | SafeFly deploys (30d) |
-| `k9.deployment_failures` | `deployment_stage_failures` | safefly | Abandoned/rejected deploys (90d) |
-| `k10.service_subscriptions` | `service_subscriptions` | service_tree | Service → Azure subscriptions |
-| `k11.repo_to_service` | `repo_service_mapping` | service_tree | Repo URL → ServiceId (reverse lookup) |
-| `k12.service_repos` | `source_repos` | service_tree | Service → registered source code repos |
-| `k13.arg_peer_resources` | `peer_resource_count` | arg | Resources in same resource group (provider excludes current resource) |
-| `k14.safefly_caused_outages` | `safefly_caused_outages_180d` | icm | Sev1/2 outages caused by SafeFly deployments (180d, via RootCauses join) |
-
-## Unknowns
-
-When an evidence key is missing (provider error, no data source configured),
-the factor is marked `unknown` with 0 points and the evidence key is added
-to the `unknowns` list in `ScoreResult`. This ensures:
-
-- Scores are **conservative** (unknown ≠ risky).
-- The report clearly shows what data was unavailable.
-- Providers can be added incrementally without breaking existing scores.
+### Rebalanced
+- `blast_radius.subscriptions`: 10 → 12 pts max, thresholds adjusted
+- `resource.peer_impact`: 5 → 8 pts max, thresholds adjusted
+- Total max: 145 (v0.1, capped to 100) → 100 (v0.2, no cap needed)

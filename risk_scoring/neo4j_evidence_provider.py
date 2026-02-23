@@ -34,11 +34,9 @@ class Neo4jEvidenceProvider:
     - resource_id, resource_type, subscription_id
     - resource_group_key, resource_group_name
     - service_id, service_name
-    - services_impacted
     - historical_outages_180d (from graph incidents, if as_of provided)
     - recent_incidents, recent_deployments
     - deployment_count_30d (always unknown in current graph)
-    - critical_services (always unknown in current graph)
     - recent_active_outages (always unknown in current graph)
     """
 

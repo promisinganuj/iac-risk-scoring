@@ -217,16 +217,15 @@ class TestSubscriptionCountScoring(unittest.TestCase):
     def _score_with_subscriptions(self, count: int | None) -> dict:
         """Run scorer with subscription_count set and return factor dict."""
         evidence = {
-            "services_impacted": 1,
-            "critical_services": [],
             "subscription_count": count,
             "historical_outages_180d": 0,
             "recent_active_outages": 0,
             "deployment_count_30d": 5,
-            "deployment_stage_failures": 0,
             "avg_mttm_minutes": 30,
             "related_incidents": 0,
-            "change_frequency_30d": 5,
+            "safefly_caused_outages_180d": 0,
+            "sev12_incident_count": 0,
+            "peer_resource_count": 0,
         }
         change = ChangeContext.create(environment="prod")
         result = score_change(change, evidence)
@@ -238,16 +237,16 @@ class TestSubscriptionCountScoring(unittest.TestCase):
 
     def test_10_plus_subs_max_points(self):
         r = self._score_with_subscriptions(10)
-        assert r["points"] == 10
+        assert r["points"] == 12
         assert r["status"] == "hit"
 
     def test_5_subs(self):
         r = self._score_with_subscriptions(5)
-        assert r["points"] == 7
+        assert r["points"] == 8
 
     def test_2_subs(self):
         r = self._score_with_subscriptions(2)
-        assert r["points"] == 4
+        assert r["points"] == 5
 
     def test_1_sub(self):
         r = self._score_with_subscriptions(1)
@@ -265,7 +264,7 @@ class TestSubscriptionCountScoring(unittest.TestCase):
 
     def test_20_subs_caps_at_10(self):
         r = self._score_with_subscriptions(20)
-        assert r["points"] == 10
+        assert r["points"] == 12
 
 
 if __name__ == "__main__":

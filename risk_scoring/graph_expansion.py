@@ -124,9 +124,6 @@ def expand_evidence_for_resource(
         return GraphExpansionResult(
             evidence={
                 "resource_id": resolved.resource_id,
-                # services_impacted left unset — cross-service blast radius
-                # is not computable from Neo4j alone (requires IcM data).
-                "critical_services": None,
                 "historical_outages_180d": None,
                 "recent_active_outages": None,
                 "deployment_count_30d": None,
@@ -150,12 +147,7 @@ def expand_evidence_for_resource(
     }
 
     has_service_context = 1 if isinstance(service_id, str) and service_id.strip() else 0
-    # services_impacted intentionally NOT set here — cross-service blast radius
-    # requires historical incident data (IcM). Leave as unknown for scoring.
 
-    # We don't currently have a deterministic "critical" field in the sample graph.
-    evidence["critical_services"] = None
-    unknowns.append("critical_services")
 
     # Incidents (used as outage history in this sample graph)
     if has_service_context == 0:

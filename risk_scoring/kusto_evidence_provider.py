@@ -40,16 +40,14 @@ class KustoEvidenceProvider:
     - historical_outages_180d
     - related_incidents
     - deployment_count_30d
-    - deployment_stage_failures (always unknown — poor proxy signal)
+    - safefly_caused_outages_180d  (Sev1/2 outages caused by SafeFly deploys, 180d)
+    - sev12_incident_count  (Count of Sev1/Sev2 incidents, 180d)
     - service_tree_id  (ServiceId from Service Tree)
     - service_subscriptions  (list of subscription dicts)
     - subscription_count
     - source_repos  (list of repo dicts from Service Tree)
     - repo_count  (number of source code repos registered)
-    - services_impacted  (blast radius: unknown until IcM cross-service query is implemented)
-    - critical_services  (blast radius: from ServiceLevel/IsExternalFacing)
-    - peer_resource_count  (blast radius: unknown without ARG)
-    - safefly_caused_outages_180d  (Sev1/2 outages caused by SafeFly deploys, 180d)
+    - peer_resource_count  (blast radius: from ARG when resource context exists)
     """
 
     def __init__(
@@ -75,9 +73,8 @@ class KustoEvidenceProvider:
         "k5.outages_180d": "historical_outages_180d",
         "k6.related_incidents": "related_incidents",
         "k8.deployment_count_30d": "deployment_count_30d",
-        # k9.deployment_failures removed — Abandoned/Rejected is a poor proxy
-        # for actual deployment failures. See follow-up bead.
         "k14.safefly_caused_outages": "safefly_caused_outages_180d",
+        "k15.sev12_incidents": "sev12_incident_count",
     }
 
     def populate(
@@ -103,14 +100,11 @@ class KustoEvidenceProvider:
         if not service_name or not isinstance(service_name, str) or not service_name.strip():
             # No service context — mark service-dependent keys as unknown.
             service_keys = list(self._QUERY_MAP.values()) + [
-                "deployment_stage_failures",
                 "service_tree_id",
                 "service_subscriptions",
                 "subscription_count",
                 "source_repos",
                 "repo_count",
-                "services_impacted",
-                "critical_services",
             ]
             for ek in service_keys:
                 evidence.setdefault(ek, None)
@@ -160,11 +154,6 @@ class KustoEvidenceProvider:
                 )
                 evidence.setdefault(evidence_key, None)
                 unknowns.append(evidence_key)
-
-        # deployment_stage_failures: always unknown until a better SafeFly
-        # signal is identified (Abandoned/Rejected != real failures).
-        evidence.setdefault("deployment_stage_failures", None)
-        unknowns.append("deployment_stage_failures")
 
         # --- Phase 2: Service Tree lookup (k7) → ServiceId + metadata ---
         service_id, service_meta = self._resolve_service_id(
@@ -407,47 +396,9 @@ class KustoEvidenceProvider:
         """Derive blast radius evidence from Service Tree and ARG data.
 
         Evidence keys populated:
-        - ``services_impacted``: left as unknown. Cross-service blast radius
-          requires historical IcM data (distinct services co-impacted in
-          past outages). Will be implemented via a dedicated KQL query.
-        - ``critical_services``: list of service names whose ServiceLevel
-          is high or that are external-facing (from k7 metadata).
         - ``peer_resource_count``: resolved via ARG when resource context is
           available (subscription + resource group); otherwise unknown.
         """
-        # --- services_impacted ---
-        # Cross-service blast radius requires historical IcM incident data
-        # (count of distinct services co-impacted in past outages).
-        # Not computable from service context alone; left as unknown.
-        evidence.setdefault("services_impacted", None)
-        unknowns.append("services_impacted")
-
-        # --- critical_services ---
-        if service_meta is not None:
-            critical: List[str] = []
-            is_critical = False
-
-            # External-facing services are considered critical.
-            if service_meta.is_external_facing is True:
-                is_critical = True
-
-            # High service levels (numeric string "1" or "2", or known
-            # labels like "Ring 0", "Ring 1") are considered critical.
-            sl = service_meta.service_level
-            if sl is not None:
-                sl_str = str(sl).strip().lower()
-                if sl_str in ("1", "2", "ring 0", "ring 1"):
-                    is_critical = True
-
-            if is_critical and service_name:
-                critical.append(service_name)
-
-            evidence["critical_services"] = critical
-            populated.append("critical_services")
-        else:
-            evidence.setdefault("critical_services", None)
-            unknowns.append("critical_services")
-
         # --- peer_resource_count ---
         subscription_id = evidence.get("subscription_id")
         resource_group_name = evidence.get("resource_group_name")

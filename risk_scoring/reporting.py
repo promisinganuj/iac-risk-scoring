@@ -251,9 +251,7 @@ def _generate_recommendations(risk_level: str, risk_score: int, factors: List[Di
         points = f.get('points', 0)
         
         if status == 'hit' and points > 0:
-            if 'production' in factor_id:
-                recommendations.append("Production environment - Extra caution advised")
-            elif 'blast_radius' in factor_id:
+            if 'blast_radius' in factor_id:
                 recommendations.append("Multiple services affected - Coordinate with service owners")
             elif 'outages' in factor_id:
                 recommendations.append("Recent outages detected - Review incident history")

@@ -35,10 +35,10 @@ class TestParser(unittest.TestCase):
             parser.parse_args(["--help"])
         self.assertEqual(ctx.exception.code, 0)
 
-    def test_environment_required(self):
+    def test_environment_optional(self):
         parser = create_parser()
-        with self.assertRaises(SystemExit):
-            parser.parse_args(["--resource-id", "x"])
+        args = parser.parse_args(["--resource-id", "x"])
+        self.assertIsNone(args.environment)
 
     def test_resource_id_only(self):
         args = create_parser().parse_args(

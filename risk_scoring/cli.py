@@ -85,12 +85,13 @@ Examples:
         help="Azure DevOps repo URI (resolves to service via Service Tree)",
     )
 
-    # --- Required ---
+    # --- Optional ---
     parser.add_argument(
         "--environment",
-        required=True,
+        required=False,
+        default=None,
         choices=["prod", "staging", "dev", "test"],
-        help="Environment where the resource exists",
+        help="Environment where the resource exists (optional, shown in report)",
     )
 
     # --- Data-source ---
@@ -324,7 +325,8 @@ def main(argv: Optional[list] = None) -> int:
         # --- Build pipeline ---
         change_context = ChangeContext.create(environment=args.environment)
         report_id_base = args.resource_id or args.service_name or args.repo_uri or "unknown"
-        report_id = f"cli-{report_id_base}-{args.environment}"
+        env_suffix = f"-{args.environment}" if args.environment else ""
+        report_id = f"cli-{report_id_base}{env_suffix}"
 
         if data_source == "neo4j" and not args.service_name:
             # Pure legacy path — existing assess_resource_change()

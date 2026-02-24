@@ -109,15 +109,16 @@ def render_markdown_report(report: Mapping[str, Any], *, max_sample_rows: int = 
     # Risk factors in table format
     lines.append("## ⚠️ Risk Factors")
     lines.append("")
-    lines.append("| Factor | Status | Points | Impact |")
-    lines.append("|--------|--------|--------|--------|")
+    lines.append("| Factor | Status | Points | Impact | Raw Value |")
+    lines.append("|--------|--------|--------|--------|-----------|")
     for f in factors:
         status_emoji = _get_status_emoji(f.get('status'))
         factor_name = f.get('title', 'Unknown')
         status = f.get('status', 'unknown')
         points = f"{f.get('points', 0)}/{f.get('max_points', 0)}"
         impact = _get_impact_level(f.get('points', 0), f.get('max_points', 1))
-        lines.append(f"| {status_emoji} {factor_name} | {status} | {points} | {impact} |")
+        raw_value = _format_raw_value(f.get('evidence') or {})
+        lines.append(f"| {status_emoji} {factor_name} | {status} | {points} | {impact} | {raw_value} |")
     lines.append("")
     
     # Detailed factor explanations
@@ -224,6 +225,26 @@ def _get_impact_level(points: int, max_points: int) -> str:
         return "Low"
     else:
         return "None"
+
+
+
+def _format_raw_value(evidence: dict) -> str:
+    """Format the raw evidence values for display in the Risk Factors table.
+
+    Each factor's evidence dict typically has one key-value pair (the evidence
+    key and its raw value).  For operations it may be a list.
+    """
+    if not evidence:
+        return "—"
+    parts = []
+    for key, val in evidence.items():
+        if val is None:
+            parts.append(f"{key}: —")
+        elif isinstance(val, list):
+            parts.append(f"{key}: {', '.join(str(v) for v in val) if val else '[]'}")
+        else:
+            parts.append(f"{key}: {val}")
+    return "; ".join(parts)
 
 
 def _generate_recommendations(risk_level: str, risk_score: int, factors: List[Dict[str, Any]], unknowns: List[str]) -> List[str]:

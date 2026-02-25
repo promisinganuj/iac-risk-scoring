@@ -1,7 +1,7 @@
 ---
 description: Gather deployment and service topology evidence from EV2 for risk scoring
 name: EV2 Evidence Gathering
-tools: ['ev2-mcp/*']
+tools: ['ev2-mcp/get_*']
 ---
 # EV2 Evidence Gathering Skill
 

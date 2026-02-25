@@ -1,5 +1,5 @@
 ---
-description: Synthesize evidence from IcM, EV2, and ADO into a deterministic risk score and report
+description: Synthesize evidence from Service Tree, IcM, EV2, and ADO into a deterministic risk score and report
 name: Risk Synthesizer
 tools: []
 ---
@@ -7,9 +7,9 @@ tools: []
 
 ## Purpose
 
-Take the evidence gathered by the IcM, EV2, and ADO skills and produce a
-**deterministic risk score** (0–100) with factor breakdown, severity level,
-and actionable recommendations.
+Take the evidence gathered by the Service Tree, IcM, EV2, and ADO skills
+and produce a **deterministic risk score** (0–100) with factor breakdown,
+severity level, and actionable recommendations.
 
 This skill performs **no MCP tool calls** — it is pure reasoning over the
 evidence collected by the other skills.
@@ -21,11 +21,23 @@ evidence collected by the other skills.
 | `service_name` | Yes | The service being assessed |
 | `environment` | Yes | Target environment (prod/staging/dev/test) |
 | `operations` | No | List of planned operations (e.g., ["delete", "update"]) |
+| `service_tree_evidence` | Yes* | Output from the Service Tree Evidence skill |
 | `icm_evidence` | Yes* | Output from the IcM Evidence skill |
 | `ev2_evidence` | Yes* | Output from the EV2 Evidence skill |
 | `ado_evidence` | No | Output from the ADO Evidence skill (enrichment only) |
 
 *If a skill was skipped (e.g., no EV2 service ID), pass `null`.
+
+## Subscription Source Priority
+
+For Factor 3 (Blast Radius — Subscriptions), resolve `subscription_count`
+in this order:
+
+1. **Service Tree** `subscription_count` (production subscriptions) — preferred
+2. **EV2** `subscription_count` (registered subscriptions) — fallback
+3. If both are `null` → Factor 3 = unknown (0 pts)
+
+Note which source was used in the evidence column of the factor table.
 
 ## Scoring Rubric
 
@@ -73,7 +85,7 @@ Apply each factor independently. Sum all points, cap at 100.
 
 | Evidence Key | Source |
 |---|---|
-| `subscription_count` | EV2 evidence |
+| `subscription_count` | **Service Tree evidence** (preferred) or EV2 evidence (fallback) |
 
 | Threshold | Points |
 |-----------|--------|
@@ -188,6 +200,9 @@ score:
 | Security posture | `active_security_alerts` | ADO | Any active alert flagged |
 | Customer impact | `customer_impact_summary` | IcM | S500/ACE customers affected |
 | Change velocity | `commit_count_30d` | ADO | >100 commits in 30d flagged as high churn |
+| HVT classification | `is_hvt` | Service Tree | High Value Target — elevated caution warranted |
+| TCB classification | `is_tcb` | Service Tree | Trusted Computing Base — security-sensitive |
+| DHE violations | `dhe_violation_count` | Service Tree | Compliance concerns |
 
 ## Output Format
 
@@ -204,6 +219,8 @@ Produce the report in this exact markdown structure:
 | **Level** | {LOW/MEDIUM/HIGH} |
 | **Environment** | {environment} |
 | **Assessment Date** | {current date} |
+| **HVT** | {Yes/No/Unknown} |
+| **TCB** | {Yes/No/Unknown} |
 
 ## Scoring Factors
 
@@ -211,7 +228,7 @@ Produce the report in this exact markdown structure:
 |---|--------|--------|-----|--------|----------|
 | 1 | Deployment-caused outages (180d) | {pts} | 15 | {hit/miss/unknown} | {value or "N/A"} |
 | 2 | Similar past incidents | {pts} | 12 | {hit/miss/unknown} | {value} |
-| 3 | Blast radius — subscriptions | {pts} | 12 | {hit/miss/unknown} | {value} |
+| 3 | Blast radius — subscriptions | {pts} | 12 | {hit/miss/unknown} | {value} (source: {Service Tree/EV2}) |
 | 4 | Recent outages (180d) | {pts} | 10 | {hit/miss/unknown} | {value} |
 | 5 | Slow mitigation (MTTM) | {pts} | 10 | {hit/miss/unknown} | {value} |
 | 6 | Deployment frequency (30d) | {pts} | 10 | {hit/miss/unknown} | {value} |
@@ -221,7 +238,23 @@ Produce the report in this exact markdown structure:
 | 10 | Recent active outages (7d) | {pts} | 5 | {hit/miss/unknown} | {value} |
 | | **Total** | **{score}** | **100** | | |
 
+## Service Identity
+
+| Field | Value |
+|-------|-------|
+| **Service Name** | {canonical name from Service Tree} |
+| **Service ID** | {service ID} |
+| **Organization** | {org} |
+| **Division** | {division} |
+| **Service Group** | {service group} |
+
+{If service was not found in Service Tree, note: "Service not validated against Service Tree."}
+
 ## Evidence Summary
+
+### Service Tree
+{Service identity confirmed/not found, production subscription count,
+HVT/TCB status, DHE violations}
 
 ### IcM Incidents
 {Summarize incident findings: count, severities, MTTM, trends}
@@ -239,6 +272,12 @@ Produce the report in this exact markdown structure:
 
 ## Enrichment Signals
 
+### Service Classification
+- **HVT (High Value Target):** {Yes/No/Unknown} — {explanation}
+- **TCB (Trusted Computing Base):** {Yes/No/Unknown} — {explanation}
+- **DHE Violations:** {count} — {summary if any}
+
+### Operations Context
 {Customer impact, pipeline health, security alerts — advisory context}
 
 ## Recommendations
@@ -250,11 +289,13 @@ Produce the report in this exact markdown structure:
 - Ensure rollback plan is documented and tested
 - Add additional monitoring for the deployment window
 - Review similar past incidents for lessons learned
+{If HVT: "⚠️ This is a **High Value Target** service — elevated review is strongly recommended."}
 
 ### If MEDIUM (34-66):
 - Review the {top factors} before proceeding
 - Ensure standard deployment safeguards are in place
 - Monitor closely during and after deployment
+{If HVT: "Note: This is an HVT service — consider additional safeguards."}
 
 ### If LOW (0-33):
 - Standard deployment process is appropriate
@@ -268,17 +309,26 @@ as additional context. This is a narrative summary, not a scoring factor.}
 
 ## Scoring Procedure
 
-1. For each factor (1–10), look up the evidence key in the provided evidence.
-2. If the value is `null`, award 0 points and mark status as `unknown`.
-3. If the value is present, apply the threshold table and award points.
-4. Set status to `hit` if points > 0, `miss` if points = 0 (but evidence was present), `unknown` if evidence was null, `n-a` if not applicable.
-5. Sum all points. Cap at 100.
-6. Determine risk level: LOW (0-33), MEDIUM (34-66), HIGH (67-100).
-7. Generate the full markdown report.
+1. **Resolve subscription_count:** Check Service Tree evidence first. If
+   `service_tree_evidence.subscription_count` is not null, use it. Otherwise
+   fall back to `ev2_evidence.subscription_count`. Note the source used.
+2. For each factor (1–10), look up the evidence key in the provided evidence.
+3. If the value is `null`, award 0 points and mark status as `unknown`.
+4. If the value is present, apply the threshold table and award points.
+5. Set status to `hit` if points > 0, `miss` if points = 0 (but evidence
+   was present), `unknown` if evidence was null, `n-a` if not applicable.
+6. Sum all points. Cap at 100.
+7. Determine risk level: LOW (0-33), MEDIUM (34-66), HIGH (67-100).
+8. Populate the Service Identity section from Service Tree evidence.
+9. Populate HVT/TCB/DHE enrichment signals.
+10. Generate the full markdown report.
 
 ## Critical Rules
 
 - **Deterministic**: Same evidence → same score. No subjectivity in factor scoring.
 - **Transparent**: Every factor shows its evidence value and threshold logic.
 - **No guessing**: Missing evidence = 0 points + `unknown` status. Never infer values.
-- **Enrichments are separate**: ADO and customer impact data appear in the report but do not affect the numeric score.
+- **Enrichments are separate**: ADO, customer impact, HVT/TCB, and DHE data
+  appear in the report but do not affect the numeric score.
+- **Source attribution**: Factor 3 must note whether data came from Service Tree
+  or EV2 in the evidence column.

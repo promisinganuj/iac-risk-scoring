@@ -58,6 +58,10 @@
 				"@azure-devops/mcp",
 				"${input:ado_org}"
 			]
+		},
+		"service-tree": {
+			"url": "https://servicetreemcpserversv01-cfbnfvgagwhbgbd3.westus-01.azurewebsites.net",
+			"type": "http"
 		}
 	},
 	"inputs": [

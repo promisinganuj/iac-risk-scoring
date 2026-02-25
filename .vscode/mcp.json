@@ -1,28 +1,70 @@
 {
-  "servers": {
-    "neo4j-database": {
-      "command": "/home/anuj/.local/bin/uvx",
-      "args": [
-        "--native-tls",
-        "--with", "fastmcp>=2.10.5,<2.18",
-        "mcp-neo4j-cypher@0.5.2",
-        "--transport", "stdio"
-      ],
-      "envFile": "${workspaceFolder}/.env"
-    },
-    "beads": {
-      "type": "stdio",
-      "command": "${workspaceFolder}/.venv/bin/beads-mcp",
-      "args": [],
-      "env": {
-        "BEADS_WORKING_DIR": "${workspaceFolder}"
-      }
-    },
-    "risk-scoring": {
-      "command": "${workspaceFolder}/.venv/bin/python3",
-      "args": ["-m", "risk_scoring.mcp_server"],
-      "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/.env"
-    }
-  }
+	"servers": {
+		"neo4j-database": {
+			"command": "/home/anuj/.local/bin/uvx",
+			"args": [
+				"--native-tls",
+				"--with",
+				"fastmcp>=2.10.5,<2.18",
+				"mcp-neo4j-cypher@0.5.2",
+				"--transport",
+				"stdio"
+			],
+			"envFile": "${workspaceFolder}/.env",
+			"type": "stdio"
+		},
+		"beads": {
+			"type": "stdio",
+			"command": "${workspaceFolder}/.venv/bin/beads-mcp",
+			"args": [],
+			"env": {
+				"BEADS_WORKING_DIR": "${workspaceFolder}"
+			}
+		},
+		"risk-scoring": {
+			"command": "${workspaceFolder}/.venv/bin/python3",
+			"args": [
+				"-m",
+				"risk_scoring.mcp_server"
+			],
+			"cwd": "${workspaceFolder}",
+			"envFile": "${workspaceFolder}/.env",
+			"type": "stdio"
+		},
+		"icm-prod": {
+			"url": "https://icm-mcp-prod.azure-api.net/v1/",
+			"type": "http"
+		},
+		"ev2-mcp": {
+			"type": "stdio",
+			"command": "dnx",
+			"args": [
+				"Ev2.McpServer",
+				"--source",
+				"https://msazure.pkgs.visualstudio.com/_packaging/Official/nuget/v3/index.json",
+				"--interactive",
+				"--yes"
+			],
+			"env": {
+				"ALLOWED_EV2_ENDPOINTS": "Prod",
+				"DOTNET_ROLL_FORWARD": "LatestMajor"
+			}
+		},
+		"ado": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@azure-devops/mcp",
+				"${input:ado_org}"
+			]
+		}
+	},
+	"inputs": [
+		{
+			"id": "ado_org",
+			"type": "promptString",
+			"description": "Azure DevOps organization name  (e.g. 'contoso')"
+		}
+	]
 }
